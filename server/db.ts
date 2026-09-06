@@ -14,7 +14,7 @@ export interface DatabaseState {
   Settings: any[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'data');
 const STORE_PATH = path.join(DATA_DIR, 'store.json');
 
 let inMemoryDb: DatabaseState = {

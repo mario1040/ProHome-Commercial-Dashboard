@@ -59,7 +59,8 @@ router.get('/health', (req: Request, res: Response) => {
 
 // ================= AUTHENTICATION =================
 
-router.post('/auth/login', (req: Request, res: Response) => {
+router.post('/auth/login', async (req: Request, res: Response) => {
+  const correlationId = (req as any).correlationId;
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -69,7 +70,12 @@ router.post('/auth/login', (req: Request, res: Response) => {
       });
     }
 
-    const user = db.getUserByUsername(username);
+    let user = db.getUserByUsername(username);
+    if (!user && isGoogleSheetsActive()) {
+      await db.pullAllFromSheets(correlationId).catch(() => {});
+      user = db.getUserByUsername(username);
+    }
+
     if (!user || !user.is_active) {
       return res.status(401).json({
         success: false,

@@ -163,19 +163,34 @@
       "updated_at": "2026-09-06T10:45:50.844Z"
     },
     {
-      "id": "prod_50760e58cb90",
-      "name": "DEACTIVATE_TEST_PRODUCT",
-      "sku": "DEACT-TEST-001",
+      "id": "prod_0db583584995",
+      "name": "Smart desk2",
+      "sku": "PHJ-FGJ-154",
       "category": "Smart Desks",
-      "selling_price": 4000,
-      "material_cost": 1200,
-      "manufacturing_cost": 800,
-      "packaging_cost": 150,
-      "delivery_cost": 200,
-      "marketing_cost": 250,
-      "is_active": false,
-      "created_at": "2026-09-06T10:56:03.851Z",
-      "updated_at": "2026-09-06T10:56:10.002Z"
+      "selling_price": 5000,
+      "material_cost": 1500,
+      "manufacturing_cost": 1000,
+      "packaging_cost": 200,
+      "delivery_cost": 300,
+      "marketing_cost": 400,
+      "is_active": true,
+      "created_at": "2026-09-06T10:58:44.518Z",
+      "updated_at": "2026-09-06T10:58:46.049Z"
+    },
+    {
+      "id": "prod_a755966379e1",
+      "name": "Smart desk3",
+      "sku": "HJG-GHJ-1457",
+      "category": "Smart Desks",
+      "selling_price": 5000,
+      "material_cost": 1500,
+      "manufacturing_cost": 1000,
+      "packaging_cost": 200,
+      "delivery_cost": 300,
+      "marketing_cost": 400,
+      "is_active": true,
+      "created_at": "2026-09-06T10:59:42.333Z",
+      "updated_at": "2026-09-06T10:59:43.667Z"
     }
   ],
   "Orders": [
@@ -586,6 +601,14 @@
       "quantity": 1,
       "unit_price": 8500,
       "created_at": "2026-09-06T01:15:00.000Z"
+    },
+    {
+      "id": "item_0ee3571327c0",
+      "order_id": "ord_573eced08c3c",
+      "product_id": "prod_50760e58cb90",
+      "quantity": 2,
+      "unit_price": 4000,
+      "created_at": "2026-09-06T10:56:05.587Z"
     }
   ],
   "Marketing": [

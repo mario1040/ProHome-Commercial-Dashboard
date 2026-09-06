@@ -3,21 +3,11 @@ dotenv.config({ override: true });
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { initDb, isGoogleSheetsActive, db } from './server/db';
-import apiRoutes from './server/routes';
+import { app } from './server/app';
+import { isGoogleSheetsActive, db } from './server/db';
 
 async function startServer() {
-  // Initialize Database from local store first so server is instantly ready
-  initDb();
-
-  const app = express();
   const PORT = 3000;
-
-  // Enable JSON request body parsing
-  app.use(express.json({ limit: '10mb' }));
-
-  // API routes mounted FIRST
-  app.use('/api', apiRoutes);
 
   // Vite middleware for development vs static build in production
   if (process.env.NODE_ENV !== 'production') {
