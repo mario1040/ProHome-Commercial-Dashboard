@@ -30,8 +30,19 @@ let inMemoryDb: DatabaseState = {
 let lastSyncTime: string | null = null;
 let lastSyncStatus: { success: boolean; message: string; timestamp: string } | null = null;
 
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyMu9VIskbfUrGQsGg0K-k-Wv7sEQxPdCAYHS0rib9EYsyuGU4UWDus4qrkv-LZFyTBOA/exec';
+const DEFAULT_GAS_SECRET = 'AKfycbyMu9VIskbfUrGQsGg0K-k-Wv7sEQxPdCAYHS0rib9EYsyuGU4UWDus4qrkv-LZFyTBOA';
+
+export function getGasUrl(): string {
+  return process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_GAS_URL;
+}
+
+export function getGasSecret(): string {
+  return process.env.GOOGLE_APPS_SCRIPT_SECRET || DEFAULT_GAS_SECRET;
+}
+
 export function isGoogleSheetsActive(): boolean {
-  return Boolean(process.env.GOOGLE_APPS_SCRIPT_URL && process.env.GOOGLE_APPS_SCRIPT_SECRET);
+  return Boolean(getGasUrl() && getGasSecret());
 }
 
 export function normalizeRecord(tableName: string, raw: any): any {
@@ -118,8 +129,10 @@ export function generateId(prefix: string): string {
 }
 
 export function getSyncMetadata() {
-  const isUrlConfigured = Boolean(process.env.GOOGLE_APPS_SCRIPT_URL);
-  const isSecretConfigured = Boolean(process.env.GOOGLE_APPS_SCRIPT_SECRET);
+  const url = getGasUrl();
+  const secret = getGasSecret();
+  const isUrlConfigured = Boolean(url);
+  const isSecretConfigured = Boolean(secret);
   const isConnected = isUrlConfigured && isSecretConfigured;
 
   return {
@@ -141,8 +154,8 @@ export async function callGoogleAppsScript(
 ) {
   const correlationId = reqCorrelationId || `gas_${Date.now().toString(36)}_${crypto.randomBytes(3).toString('hex')}`;
   const startTime = Date.now();
-  const url = process.env.GOOGLE_APPS_SCRIPT_URL;
-  const secret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+  const url = getGasUrl();
+  const secret = getGasSecret();
 
   if (!url) {
     logStructured({
