@@ -45,11 +45,55 @@ export function isGoogleSheetsActive(): boolean {
   return Boolean(getGasUrl() && getGasSecret());
 }
 
+export const TABLE_SCHEMAS: Record<string, string[]> = {
+  Users: ['id', 'username', 'email', 'password_hash', 'role', 'is_active', 'created_at', 'updated_at'],
+  Products: [
+    'id', 'name', 'sku', 'category', 'selling_price', 'material_cost',
+    'manufacturing_cost', 'packaging_cost', 'delivery_cost', 'marketing_cost',
+    'is_active', 'created_at', 'updated_at'
+  ],
+  Orders: ['id', 'order_number', 'order_date', 'status', 'customer_name', 'customer_phone', 'notes', 'created_at', 'updated_at'],
+  Order_Items: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'created_at'],
+  Marketing: ['id', 'month', 'spend', 'orders_generated', 'revenue', 'created_at', 'updated_at'],
+  Targets: ['id', 'month', 'sales_target', 'profit_margin_min', 'profit_margin_max', 'created_at', 'updated_at'],
+  Settings: ['key', 'value', 'updated_at']
+};
+
 export function normalizeRecord(tableName: string, raw: any): any {
   if (!raw || typeof raw !== 'object') return raw;
-  const copy = { ...raw };
+  const copy: any = { ...raw };
+  const schema = TABLE_SCHEMAS[tableName] || [];
+
+  // Robust mapping for sheets where headers might be "Column 1", "Column 2" or numbered
+  for (let i = 0; i < schema.length; i++) {
+    const colName = schema[i];
+    const colNum = i + 1;
+    const variations = [
+      `Column ${colNum}`,
+      `column ${colNum}`,
+      `Column_${colNum}`,
+      `column_${colNum}`,
+      `Col ${colNum}`,
+      `col ${colNum}`,
+      `Column${colNum}`,
+      `column${colNum}`,
+    ];
+
+    if (copy[colName] === undefined || copy[colName] === null) {
+      for (const v of variations) {
+        if (copy[v] !== undefined && copy[v] !== null) {
+          copy[colName] = copy[v];
+          break;
+        }
+      }
+    }
+  }
 
   if (tableName === 'Products') {
+    copy.id = String(copy.id || '');
+    copy.name = String(copy.name || '');
+    copy.sku = String(copy.sku || '');
+    copy.category = String(copy.category || 'General');
     copy.selling_price = Math.max(0, Number(copy.selling_price) || 0);
     copy.material_cost = Math.max(0, Number(copy.material_cost) || 0);
     copy.manufacturing_cost = Math.max(0, Number(copy.manufacturing_cost) || 0);
@@ -58,25 +102,41 @@ export function normalizeRecord(tableName: string, raw: any): any {
     copy.marketing_cost = Math.max(0, Number(copy.marketing_cost) || 0);
     copy.is_active = copy.is_active === true || copy.is_active === 'TRUE' || copy.is_active === 'true' || copy.is_active === 1 || copy.is_active === '1';
   } else if (tableName === 'Orders') {
-    // String dates / strings
+    copy.id = String(copy.id || '');
     copy.order_number = String(copy.order_number || '');
     copy.order_date = String(copy.order_date || '');
     copy.status = String(copy.status || 'Pending');
     copy.customer_name = String(copy.customer_name || '');
     copy.customer_phone = String(copy.customer_phone || '');
+    copy.notes = String(copy.notes || '');
   } else if (tableName === 'Order_Items') {
+    copy.id = String(copy.id || '');
+    copy.order_id = String(copy.order_id || '');
+    copy.product_id = String(copy.product_id || '');
     copy.quantity = Math.max(1, Number(copy.quantity) || 1);
     copy.unit_price = Math.max(0, Number(copy.unit_price) || 0);
   } else if (tableName === 'Marketing') {
+    copy.id = String(copy.id || '');
+    copy.month = String(copy.month || '');
     copy.spend = Math.max(0, Number(copy.spend) || 0);
     copy.orders_generated = Math.max(0, Number(copy.orders_generated) || 0);
     copy.revenue = Math.max(0, Number(copy.revenue) || 0);
   } else if (tableName === 'Targets') {
+    copy.id = String(copy.id || '');
+    copy.month = String(copy.month || '');
     copy.sales_target = Math.max(0, Number(copy.sales_target) || 0);
     copy.profit_margin_min = Number(copy.profit_margin_min) || 25;
     copy.profit_margin_max = Number(copy.profit_margin_max) || 30;
   } else if (tableName === 'Users') {
+    copy.id = String(copy.id || '');
+    copy.username = String(copy.username || '');
+    copy.email = String(copy.email || '');
+    copy.password_hash = String(copy.password_hash || '');
+    copy.role = String(copy.role || 'viewer');
     copy.is_active = copy.is_active === true || copy.is_active === 'TRUE' || copy.is_active === 'true' || copy.is_active === 1 || copy.is_active === '1';
+  } else if (tableName === 'Settings') {
+    copy.key = String(copy.key || '');
+    copy.value = copy.value !== undefined && copy.value !== null ? copy.value : '';
   }
 
   return copy;
@@ -351,12 +411,14 @@ export const db = {
   },
 
   getUserByUsername(username: string) {
+    if (!username) return undefined;
     const clean = username.trim().toLowerCase();
     return inMemoryDb.Users.find(
       (u) =>
-        u.username.toLowerCase() === clean ||
+        (u.username && u.username.toLowerCase() === clean) ||
         (u.email && u.email.toLowerCase() === clean) ||
-        (clean === 'jemyneutron228@gmail.com' && u.role === 'admin')
+        (clean === 'jemyneutron228@gmail.com' && (u.role === 'admin' || u.username === 'admin')) ||
+        (clean === 'admin' && (u.username === 'admin' || u.role === 'admin'))
     );
   },
 
@@ -434,7 +496,8 @@ export const db = {
   },
 
   getProductBySku(sku: string) {
-    return inMemoryDb.Products.find((p) => p.sku.trim().toLowerCase() === sku.trim().toLowerCase());
+    if (!sku) return undefined;
+    return inMemoryDb.Products.find((p) => (p.sku || '').trim().toLowerCase() === sku.trim().toLowerCase());
   },
 
   async createProduct(data: any, correlationId?: string) {
