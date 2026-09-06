@@ -30,15 +30,23 @@ let inMemoryDb: DatabaseState = {
 let lastSyncTime: string | null = null;
 let lastSyncStatus: { success: boolean; message: string; timestamp: string } | null = null;
 
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyMu9VIskbfUrGQsGg0K-k-Wv7sEQxPdCAYHS0rib9EYsyuGU4UWDus4qrkv-LZFyTBOA/exec';
-const DEFAULT_GAS_SECRET = 'AKfycbyMu9VIskbfUrGQsGg0K-k-Wv7sEQxPdCAYHS0rib9EYsyuGU4UWDus4qrkv-LZFyTBOA';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbywe5GzyLoyW7VppCwe3bkfxhAQq37hSzjgbXYY9tN4LSJFd1giQkHkWrEbEsO_OnLugA/exec';
+const DEFAULT_GAS_SECRET = 'AKfycbywe5GzyLoyW7VppCwe3bkfxhAQq37hSzjgbXYY9tN4LSJFd1giQkHkWrEbEsO_OnLugA';
 
 export function getGasUrl(): string {
-  return process.env.GOOGLE_APPS_SCRIPT_URL || DEFAULT_GAS_URL;
+  const envUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
+  if (envUrl && !envUrl.includes('LZFyTBOA') && !envUrl.includes('AKfycbxTG8')) {
+    return envUrl;
+  }
+  return DEFAULT_GAS_URL;
 }
 
 export function getGasSecret(): string {
-  return process.env.GOOGLE_APPS_SCRIPT_SECRET || DEFAULT_GAS_SECRET;
+  const envSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
+  if (envSecret && !envSecret.includes('LZFyTBOA') && !envSecret.includes('AKfycbxTG8')) {
+    return envSecret;
+  }
+  return DEFAULT_GAS_SECRET;
 }
 
 export function isGoogleSheetsActive(): boolean {
