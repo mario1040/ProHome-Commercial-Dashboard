@@ -1,0 +1,687 @@
+import { hashPassword } from './auth';
+
+export function getInitialSeedData() {
+  const now = new Date().toISOString();
+  const defaultAdminHash = hashPassword('prohome2026!');
+
+  const users = [
+    {
+      id: 'usr_admin_01',
+      username: 'admin',
+      email: 'jemyneutron228@gmail.com',
+      password_hash: defaultAdminHash,
+      role: 'admin',
+      is_active: true,
+      created_at: '2026-07-01T08:00:00.000Z',
+      updated_at: now,
+    },
+  ];
+
+  const products = [
+    {
+      id: 'prod_dsk_01',
+      name: 'Smart Desk Pro (Motorized)',
+      sku: 'PH-DSK-001',
+      category: 'Smart Desks',
+      selling_price: 8500,
+      material_cost: 2800,
+      manufacturing_cost: 1600,
+      packaging_cost: 350,
+      delivery_cost: 450,
+      marketing_cost: 600,
+      is_active: true,
+      created_at: '2026-07-01T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_tbl_02',
+      name: 'Foldable Transforming Dining Table',
+      sku: 'PH-TBL-002',
+      category: 'Transforming Tables',
+      selling_price: 6800,
+      material_cost: 2200,
+      manufacturing_cost: 1400,
+      packaging_cost: 300,
+      delivery_cost: 400,
+      marketing_cost: 500,
+      is_active: true,
+      created_at: '2026-07-01T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_bed_03',
+      name: 'Space Saver Bed with Gas-Lift Storage',
+      sku: 'PH-BED-003',
+      category: 'Beds & Murphy',
+      selling_price: 18500,
+      material_cost: 6200,
+      manufacturing_cost: 3500,
+      packaging_cost: 750,
+      delivery_cost: 950,
+      marketing_cost: 1200,
+      is_active: true,
+      created_at: '2026-07-01T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_sof_04',
+      name: 'Modular Space-Optimized Sofa',
+      sku: 'PH-SOF-004',
+      category: 'Living',
+      selling_price: 14200,
+      material_cost: 4800,
+      manufacturing_cost: 2900,
+      packaging_cost: 600,
+      delivery_cost: 800,
+      marketing_cost: 1100,
+      is_active: true,
+      created_at: '2026-07-01T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_str_05',
+      name: 'Wall Modular Storage Unit',
+      sku: 'PH-STR-005',
+      category: 'Storage',
+      selling_price: 5400,
+      material_cost: 1700,
+      manufacturing_cost: 1100,
+      packaging_cost: 250,
+      delivery_cost: 350,
+      marketing_cost: 400,
+      is_active: true,
+      created_at: '2026-07-01T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_tbl_06',
+      name: 'Compact Lift Coffee Table',
+      sku: 'PH-TBL-006',
+      category: 'Transforming Tables',
+      selling_price: 4200,
+      material_cost: 1300,
+      manufacturing_cost: 900,
+      packaging_cost: 200,
+      delivery_cost: 300,
+      marketing_cost: 300,
+      is_active: true,
+      created_at: '2026-07-05T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_bed_07',
+      name: 'Murphy Bed with Integrated Desk',
+      sku: 'PH-BED-007',
+      category: 'Beds & Murphy',
+      selling_price: 23000,
+      material_cost: 7800,
+      manufacturing_cost: 4500,
+      packaging_cost: 900,
+      delivery_cost: 1200,
+      marketing_cost: 1600,
+      is_active: true,
+      created_at: '2026-07-10T09:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'prod_kit_08',
+      name: 'Expandable Kitchen Island',
+      sku: 'PH-KIT-008',
+      category: 'Kitchen & Dining',
+      selling_price: 9200,
+      material_cost: 3100,
+      manufacturing_cost: 1900,
+      packaging_cost: 400,
+      delivery_cost: 500,
+      marketing_cost: 700,
+      is_active: true,
+      created_at: '2026-07-15T09:00:00.000Z',
+      updated_at: now,
+    },
+  ];
+
+  // Orders across 2026-07, 2026-08, 2026-09
+  const orders = [
+    // --- July 2026 Orders ---
+    {
+      id: 'ord_jul_01',
+      order_number: 'PH-202607-001',
+      order_date: '2026-07-04',
+      status: 'Delivered',
+      customer_name: 'Tarek Mansour',
+      customer_phone: '+20 100 452 8192',
+      notes: 'Delivered to New Cairo, Fifth Settlement. Client requested white oak finish.',
+      created_at: '2026-07-04T10:15:00.000Z',
+      updated_at: '2026-07-07T14:00:00.000Z',
+    },
+    {
+      id: 'ord_jul_02',
+      order_number: 'PH-202607-002',
+      order_date: '2026-07-08',
+      status: 'Delivered',
+      customer_name: 'Nour El-Din',
+      customer_phone: '+20 112 390 1845',
+      notes: 'Sheikh Zayed villa, installation assistance provided.',
+      created_at: '2026-07-08T11:30:00.000Z',
+      updated_at: '2026-07-12T16:20:00.000Z',
+    },
+    {
+      id: 'ord_jul_03',
+      order_number: 'PH-202607-003',
+      order_date: '2026-07-15',
+      status: 'Delivered',
+      customer_name: 'Farida Sami',
+      customer_phone: '+20 106 728 9301',
+      notes: 'Maadi apartment, tight corridor, space-saver bed fitted smoothly.',
+      created_at: '2026-07-15T14:20:00.000Z',
+      updated_at: '2026-07-18T12:00:00.000Z',
+    },
+    {
+      id: 'ord_jul_04',
+      order_number: 'PH-202607-004',
+      order_date: '2026-07-22',
+      status: 'Delivered',
+      customer_name: 'Omar Sherif',
+      customer_phone: '+20 120 481 0293',
+      notes: 'Heliopolis duplex.',
+      created_at: '2026-07-22T09:45:00.000Z',
+      updated_at: '2026-07-25T11:00:00.000Z',
+    },
+    {
+      id: 'ord_jul_05',
+      order_number: 'PH-202607-005',
+      order_date: '2026-07-28',
+      status: 'Cancelled',
+      customer_name: 'Hassan Kamel',
+      customer_phone: '+20 109 234 5678',
+      notes: 'Customer changed mind before manufacturing commenced.',
+      created_at: '2026-07-28T16:00:00.000Z',
+      updated_at: '2026-07-29T10:00:00.000Z',
+    },
+
+    // --- August 2026 Orders ---
+    {
+      id: 'ord_aug_01',
+      order_number: 'PH-202608-001',
+      order_date: '2026-08-02',
+      status: 'Delivered',
+      customer_name: 'Laila Mostafa',
+      customer_phone: '+20 101 829 4721',
+      notes: 'Home office setup complete with smart desk and wall storage.',
+      created_at: '2026-08-02T10:00:00.000Z',
+      updated_at: '2026-08-05T15:00:00.000Z',
+    },
+    {
+      id: 'ord_aug_02',
+      order_number: 'PH-202608-002',
+      order_date: '2026-08-07',
+      status: 'Delivered',
+      customer_name: 'Karim Abdel-Rahman',
+      customer_phone: '+20 114 902 3810',
+      notes: 'Murphy bed custom walnut tone.',
+      created_at: '2026-08-07T12:30:00.000Z',
+      updated_at: '2026-08-11T13:40:00.000Z',
+    },
+    {
+      id: 'ord_aug_03',
+      order_number: 'PH-202608-003',
+      order_date: '2026-08-12',
+      status: 'Delivered',
+      customer_name: 'Yasmin Zaki',
+      customer_phone: '+20 128 374 9182',
+      notes: 'Modular sofa in deep charcoal fabric.',
+      created_at: '2026-08-12T15:10:00.000Z',
+      updated_at: '2026-08-16T17:00:00.000Z',
+    },
+    {
+      id: 'ord_aug_04',
+      order_number: 'PH-202608-004',
+      order_date: '2026-08-18',
+      status: 'Delivered',
+      customer_name: 'Amr El-Gohary',
+      customer_phone: '+20 102 619 8234',
+      notes: 'Transforming dining table + kitchen island combo.',
+      created_at: '2026-08-18T11:00:00.000Z',
+      updated_at: '2026-08-21T16:00:00.000Z',
+    },
+    {
+      id: 'ord_aug_05',
+      order_number: 'PH-202608-005',
+      order_date: '2026-08-24',
+      status: 'Delivered',
+      customer_name: 'Salma Fathy',
+      customer_phone: '+20 111 482 9103',
+      notes: 'Two space saver beds for rental apartment.',
+      created_at: '2026-08-24T14:00:00.000Z',
+      updated_at: '2026-08-28T12:00:00.000Z',
+    },
+    {
+      id: 'ord_aug_06',
+      order_number: 'PH-202608-006',
+      order_date: '2026-08-29',
+      status: 'Refunded',
+      customer_name: 'Mahmoud Rady',
+      customer_phone: '+20 100 923 8471',
+      notes: 'Dimensions did not fit client room; full refund issued.',
+      created_at: '2026-08-29T10:00:00.000Z',
+      updated_at: '2026-08-30T16:00:00.000Z',
+    },
+
+    // --- September 2026 Orders (Current Month) ---
+    {
+      id: 'ord_sep_01',
+      order_number: 'PH-202609-001',
+      order_date: '2026-09-01',
+      status: 'Delivered',
+      customer_name: 'Sherif Wagdy',
+      customer_phone: '+20 100 782 1920',
+      notes: 'Smart desk setup, 6th of October city.',
+      created_at: '2026-09-01T09:30:00.000Z',
+      updated_at: '2026-09-03T14:00:00.000Z',
+    },
+    {
+      id: 'ord_sep_02',
+      order_number: 'PH-202609-002',
+      order_date: '2026-09-02',
+      status: 'Delivered',
+      customer_name: 'Dina Ezzat',
+      customer_phone: '+20 122 849 1029',
+      notes: 'Murphy bed with desk + compact lift coffee table.',
+      created_at: '2026-09-02T11:15:00.000Z',
+      updated_at: '2026-09-05T12:30:00.000Z',
+    },
+    {
+      id: 'ord_sep_03',
+      order_number: 'PH-202609-003',
+      order_date: '2026-09-03',
+      status: 'Delivered',
+      customer_name: 'Mohamed Anis',
+      customer_phone: '+20 115 628 3910',
+      notes: 'Space saver bed and modular sofa.',
+      created_at: '2026-09-03T13:45:00.000Z',
+      updated_at: '2026-09-05T17:00:00.000Z',
+    },
+    {
+      id: 'ord_sep_04',
+      order_number: 'PH-202609-004',
+      order_date: '2026-09-04',
+      status: 'Delivered',
+      customer_name: 'Rana Soliman',
+      customer_phone: '+20 109 481 7263',
+      notes: 'Foldable dining table + expandable kitchen island.',
+      created_at: '2026-09-04T10:00:00.000Z',
+      updated_at: '2026-09-06T01:00:00.000Z',
+    },
+    {
+      id: 'ord_sep_05',
+      order_number: 'PH-202609-005',
+      order_date: '2026-09-05',
+      status: 'Processing',
+      customer_name: 'Hany Guirguis',
+      customer_phone: '+20 120 739 1824',
+      notes: 'In assembly queue at Cairo workshop.',
+      created_at: '2026-09-05T11:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'ord_sep_06',
+      order_number: 'PH-202609-006',
+      order_date: '2026-09-05',
+      status: 'Confirmed',
+      customer_name: 'Mariam Adel',
+      customer_phone: '+20 101 938 4729',
+      notes: 'Down payment confirmed via bank transfer.',
+      created_at: '2026-09-05T14:30:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'ord_sep_07',
+      order_number: 'PH-202609-007',
+      order_date: '2026-09-06',
+      status: 'Pending',
+      customer_name: 'Ahmed Fikry',
+      customer_phone: '+20 111 839 2018',
+      notes: 'Awaiting client color confirmation.',
+      created_at: '2026-09-06T01:15:00.000Z',
+      updated_at: now,
+    },
+  ];
+
+  // Order Items preserving historical unit_price
+  const order_items = [
+    // ord_jul_01
+    {
+      id: 'item_jul_01_1',
+      order_id: 'ord_jul_01',
+      product_id: 'prod_dsk_01',
+      quantity: 2,
+      unit_price: 8500,
+      created_at: '2026-07-04T10:15:00.000Z',
+    },
+    {
+      id: 'item_jul_01_2',
+      order_id: 'ord_jul_01',
+      product_id: 'prod_str_05',
+      quantity: 1,
+      unit_price: 5400,
+      created_at: '2026-07-04T10:15:00.000Z',
+    },
+
+    // ord_jul_02
+    {
+      id: 'item_jul_02_1',
+      order_id: 'ord_jul_02',
+      product_id: 'prod_tbl_02',
+      quantity: 1,
+      unit_price: 6800,
+      created_at: '2026-07-08T11:30:00.000Z',
+    },
+    {
+      id: 'item_jul_02_2',
+      order_id: 'ord_jul_02',
+      product_id: 'prod_tbl_06',
+      quantity: 2,
+      unit_price: 4200,
+      created_at: '2026-07-08T11:30:00.000Z',
+    },
+
+    // ord_jul_03
+    {
+      id: 'item_jul_03_1',
+      order_id: 'ord_jul_03',
+      product_id: 'prod_bed_03',
+      quantity: 1,
+      unit_price: 18500,
+      created_at: '2026-07-15T14:20:00.000Z',
+    },
+
+    // ord_jul_04
+    {
+      id: 'item_jul_04_1',
+      order_id: 'ord_jul_04',
+      product_id: 'prod_sof_04',
+      quantity: 1,
+      unit_price: 14200,
+      created_at: '2026-07-22T09:45:00.000Z',
+    },
+    {
+      id: 'item_jul_04_2',
+      order_id: 'ord_jul_04',
+      product_id: 'prod_kit_08',
+      quantity: 1,
+      unit_price: 9200,
+      created_at: '2026-07-22T09:45:00.000Z',
+    },
+
+    // ord_jul_05 (Cancelled)
+    {
+      id: 'item_jul_05_1',
+      order_id: 'ord_jul_05',
+      product_id: 'prod_dsk_01',
+      quantity: 1,
+      unit_price: 8500,
+      created_at: '2026-07-28T16:00:00.000Z',
+    },
+
+    // ord_aug_01
+    {
+      id: 'item_aug_01_1',
+      order_id: 'ord_aug_01',
+      product_id: 'prod_dsk_01',
+      quantity: 2,
+      unit_price: 8500,
+      created_at: '2026-08-02T10:00:00.000Z',
+    },
+    {
+      id: 'item_aug_01_2',
+      order_id: 'ord_aug_01',
+      product_id: 'prod_str_05',
+      quantity: 2,
+      unit_price: 5400,
+      created_at: '2026-08-02T10:00:00.000Z',
+    },
+
+    // ord_aug_02
+    {
+      id: 'item_aug_02_1',
+      order_id: 'ord_aug_02',
+      product_id: 'prod_bed_07',
+      quantity: 1,
+      unit_price: 23000,
+      created_at: '2026-08-07T12:30:00.000Z',
+    },
+
+    // ord_aug_03
+    {
+      id: 'item_aug_03_1',
+      order_id: 'ord_aug_03',
+      product_id: 'prod_sof_04',
+      quantity: 1,
+      unit_price: 14200,
+      created_at: '2026-08-12T15:10:00.000Z',
+    },
+
+    // ord_aug_04
+    {
+      id: 'item_aug_04_1',
+      order_id: 'ord_aug_04',
+      product_id: 'prod_tbl_02',
+      quantity: 2,
+      unit_price: 6800,
+      created_at: '2026-08-18T11:00:00.000Z',
+    },
+    {
+      id: 'item_aug_04_2',
+      order_id: 'ord_aug_04',
+      product_id: 'prod_kit_08',
+      quantity: 1,
+      unit_price: 9200,
+      created_at: '2026-08-18T11:00:00.000Z',
+    },
+
+    // ord_aug_05
+    {
+      id: 'item_aug_05_1',
+      order_id: 'ord_aug_05',
+      product_id: 'prod_bed_03',
+      quantity: 2,
+      unit_price: 18500,
+      created_at: '2026-08-24T14:00:00.000Z',
+    },
+
+    // ord_aug_06 (Refunded)
+    {
+      id: 'item_aug_06_1',
+      order_id: 'ord_aug_06',
+      product_id: 'prod_bed_07',
+      quantity: 1,
+      unit_price: 23000,
+      created_at: '2026-08-29T10:00:00.000Z',
+    },
+
+    // ord_sep_01 (Current month)
+    {
+      id: 'item_sep_01_1',
+      order_id: 'ord_sep_01',
+      product_id: 'prod_dsk_01',
+      quantity: 3,
+      unit_price: 8500,
+      created_at: '2026-09-01T09:30:00.000Z',
+    },
+
+    // ord_sep_02 (Current month)
+    {
+      id: 'item_sep_02_1',
+      order_id: 'ord_sep_02',
+      product_id: 'prod_bed_07',
+      quantity: 1,
+      unit_price: 23000,
+      created_at: '2026-09-02T11:15:00.000Z',
+    },
+    {
+      id: 'item_sep_02_2',
+      order_id: 'ord_sep_02',
+      product_id: 'prod_tbl_06',
+      quantity: 1,
+      unit_price: 4200,
+      created_at: '2026-09-02T11:15:00.000Z',
+    },
+
+    // ord_sep_03 (Current month)
+    {
+      id: 'item_sep_03_1',
+      order_id: 'ord_sep_03',
+      product_id: 'prod_bed_03',
+      quantity: 1,
+      unit_price: 18500,
+      created_at: '2026-09-03T13:45:00.000Z',
+    },
+    {
+      id: 'item_sep_03_2',
+      order_id: 'ord_sep_03',
+      product_id: 'prod_sof_04',
+      quantity: 1,
+      unit_price: 14200,
+      created_at: '2026-09-03T13:45:00.000Z',
+    },
+
+    // ord_sep_04 (Current month)
+    {
+      id: 'item_sep_04_1',
+      order_id: 'ord_sep_04',
+      product_id: 'prod_tbl_02',
+      quantity: 1,
+      unit_price: 6800,
+      created_at: '2026-09-04T10:00:00.000Z',
+    },
+    {
+      id: 'item_sep_04_2',
+      order_id: 'ord_sep_04',
+      product_id: 'prod_kit_08',
+      quantity: 1,
+      unit_price: 9200,
+      created_at: '2026-09-04T10:00:00.000Z',
+    },
+
+    // ord_sep_05 (Processing)
+    {
+      id: 'item_sep_05_1',
+      order_id: 'ord_sep_05',
+      product_id: 'prod_bed_07',
+      quantity: 1,
+      unit_price: 23000,
+      created_at: '2026-09-05T11:00:00.000Z',
+    },
+
+    // ord_sep_06 (Confirmed)
+    {
+      id: 'item_sep_06_1',
+      order_id: 'ord_sep_06',
+      product_id: 'prod_sof_04',
+      quantity: 1,
+      unit_price: 14200,
+      created_at: '2026-09-05T14:30:00.000Z',
+    },
+
+    // ord_sep_07 (Pending)
+    {
+      id: 'item_sep_07_1',
+      order_id: 'ord_sep_07',
+      product_id: 'prod_dsk_01',
+      quantity: 1,
+      unit_price: 8500,
+      created_at: '2026-09-06T01:15:00.000Z',
+    },
+  ];
+
+  // Marketing records
+  const marketing = [
+    {
+      id: 'mkt_jul_01',
+      month: '2026-07',
+      spend: 18000,
+      orders_generated: 7,
+      revenue: 82000,
+      created_at: '2026-07-01T08:00:00.000Z',
+      updated_at: '2026-07-31T20:00:00.000Z',
+    },
+    {
+      id: 'mkt_aug_01',
+      month: '2026-08',
+      spend: 25000,
+      orders_generated: 9,
+      revenue: 118000,
+      created_at: '2026-08-01T08:00:00.000Z',
+      updated_at: '2026-08-31T20:00:00.000Z',
+    },
+    {
+      id: 'mkt_sep_01',
+      month: '2026-09',
+      spend: 12000,
+      orders_generated: 5,
+      revenue: 100900,
+      created_at: '2026-09-01T08:00:00.000Z',
+      updated_at: now,
+    },
+  ];
+
+  // Targets (Sales Target: 300,000 EGP, Profit margin: 25% - 30%)
+  const targets = [
+    {
+      id: 'tgt_jul_01',
+      month: '2026-07',
+      sales_target: 300000,
+      profit_margin_min: 25,
+      profit_margin_max: 30,
+      created_at: '2026-07-01T08:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'tgt_aug_01',
+      month: '2026-08',
+      sales_target: 300000,
+      profit_margin_min: 25,
+      profit_margin_max: 30,
+      created_at: '2026-08-01T08:00:00.000Z',
+      updated_at: now,
+    },
+    {
+      id: 'tgt_sep_01',
+      month: '2026-09',
+      sales_target: 300000,
+      profit_margin_min: 25,
+      profit_margin_max: 30,
+      created_at: '2026-09-01T08:00:00.000Z',
+      updated_at: now,
+    },
+  ];
+
+  // Settings
+  const settings = [
+    {
+      key: 'brand_name',
+      value: 'ProHome Commercial Dashboard',
+      updated_at: now,
+    },
+    {
+      key: 'currency',
+      value: 'EGP',
+      updated_at: now,
+    },
+    {
+      key: 'initialized',
+      value: 'true',
+      updated_at: now,
+    },
+  ];
+
+  return {
+    Users: users,
+    Products: products,
+    Orders: orders,
+    Order_Items: order_items,
+    Marketing: marketing,
+    Targets: targets,
+    Settings: settings,
+  };
+}

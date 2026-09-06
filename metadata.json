@@ -1,0 +1,6 @@
+{
+  "name": "ProHome Commercial Dashboard",
+  "description": "Commercial dashboard for monthly and weekly sales, orders, product profitability, marketing efficiency, and commercial performance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
