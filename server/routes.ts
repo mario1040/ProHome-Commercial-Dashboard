@@ -2,48 +2,70 @@ import { Router, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import {
   db,
+  isGoogleSheetsActive,
   getSyncMetadata,
   callGoogleAppsScript,
-  isGoogleSheetsActive,
 } from './db';
 import {
-  hashPassword,
-  verifyPassword,
-  generateToken,
-  requireAuth,
-  AuthenticatedRequest,
-} from './auth';
-import {
   calculateDashboardMetrics,
-  calculateMonthlyPerformance,
   calculateProductMix,
+  calculateMonthlyPerformance,
 } from '../src/calculations/businessMetrics';
-import { logStructured } from './logger';
+import {
+  verifyPassword,
+  hashPassword,
+  generateToken,
+  verifyToken,
+  JWTPayload,
+} from './auth';
+import { logStructured, logAuditTrail } from './logger';
 
 const router = Router();
 
-// Middleware to assign correlation ID and log all requests & responses
+export interface AuthenticatedRequest extends Request {
+  user?: JWTPayload;
+  correlationId?: string;
+}
+
+// Authentication middleware
+export const requireAuth = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'Authentication required. Please log in.' },
+    });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const payload = verifyToken(token);
+
+  if (!payload) {
+    return res.status(401).json({
+      success: false,
+      error: { code: 'INVALID_TOKEN', message: 'Session expired or invalid. Please sign in again.' },
+    });
+  }
+
+  req.user = payload;
+  next();
+};
+
+// Global correlation ID and request audit middleware
 router.use((req: Request, res: Response, next: NextFunction) => {
-  const correlationId = `req_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
+  const incomingId = req.headers['x-correlation-id'] as string;
+  const correlationId = incomingId || `req_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
   (req as any).correlationId = correlationId;
+  res.setHeader('X-Correlation-ID', correlationId);
+
   const startTime = Date.now();
-
-  logStructured({
-    type: 'REQUEST',
-    correlationId,
-    method: req.method,
-    path: req.originalUrl || req.path,
-    sanitizedResponse: req.body,
-    message: `Incoming ${req.method} ${req.originalUrl || req.path}`,
-  });
-
   res.on('finish', () => {
     const durationMs = Date.now() - startTime;
-    logStructured({
-      type: 'RESPONSE',
+    logAuditTrail({
       correlationId,
-      method: req.method,
-      path: req.originalUrl || req.path,
+      endpoint: `${req.method} ${req.path}`,
+      user: (req as any).user ? (req as any).user.username : 'anonymous',
+      ip: req.ip || (req.headers['x-forwarded-for'] as string) || '127.0.0.1',
       statusCode: res.statusCode,
       durationMs,
     });
@@ -54,7 +76,11 @@ router.use((req: Request, res: Response, next: NextFunction) => {
 
 // Health check
 router.get('/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    mode: 'ONLINE_ONLY_GOOGLE_SHEETS',
+    time: new Date().toISOString(),
+  });
 });
 
 // ================= AUTHENTICATION =================
@@ -70,10 +96,18 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       });
     }
 
-    let user = db.getUserByUsername(username);
-    if (!user && isGoogleSheetsActive()) {
-      await db.pullAllFromSheets(correlationId).catch(() => {});
-      user = db.getUserByUsername(username);
+    let user;
+    try {
+      user = await db.getUserByUsername(username, correlationId);
+    } catch (dbErr: any) {
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: dbErr.code || 'DATABASE_UNAVAILABLE',
+          message: dbErr.message || 'Google Sheets database is currently unavailable. Please verify connectivity in Settings.',
+          isAuthError: Boolean(dbErr.isAuthError),
+        },
+      });
     }
 
     if (!user || !user.is_active) {
@@ -121,20 +155,25 @@ router.post('/auth/logout', (req: Request, res: Response) => {
   return res.json({ success: true, message: 'Logged out successfully' });
 });
 
-router.get('/auth/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const user = db.getUserById(req.user!.userId);
-  if (!user) {
-    return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
-  }
+router.get('/auth/me', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const correlationId = (req as any).correlationId;
+  try {
+    const user = await db.getUserById(req.user!.userId, correlationId);
+    if (!user) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
+    }
 
-  return res.json({
-    success: true,
-    data: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-    },
-  });
+    return res.json({
+      success: true,
+      data: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    });
+  } catch (err: any) {
+    return res.status(503).json({ success: false, error: { code: 'DATABASE_ERROR', message: err.message } });
+  }
 });
 
 router.put('/auth/change-password', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
@@ -155,7 +194,7 @@ router.put('/auth/change-password', requireAuth, async (req: AuthenticatedReques
       });
     }
 
-    const user = db.getUserById(req.user!.userId);
+    const user = await db.getUserById(req.user!.userId, correlationId);
     if (!user) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
     }
@@ -170,7 +209,7 @@ router.put('/auth/change-password', requireAuth, async (req: AuthenticatedReques
     const newHash = hashPassword(newPassword);
     await db.updateUser(user.id, { password_hash: newHash }, correlationId);
 
-    return res.json({ success: true, message: 'Password updated successfully' });
+    return res.json({ success: true, message: 'Password updated successfully in Google Sheets' });
   } catch (err: any) {
     return res.status(500).json({
       success: false,
@@ -188,14 +227,17 @@ router.get('/products', requireAuth, async (req: Request, res: Response) => {
     const products = await db.getProducts(fresh, correlationId);
     return res.json({ success: true, data: products });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({
+      success: false,
+      error: { code: 'DATABASE_ERROR', message: err.message },
+    });
   }
 });
 
 router.post('/products', requireAuth, async (req: Request, res: Response) => {
   const correlationId = (req as any).correlationId;
   try {
-    const { name, sku, category, selling_price } = req.body;
+    const { name, sku } = req.body;
     if (!name || !sku) {
       return res.status(400).json({
         success: false,
@@ -207,7 +249,7 @@ router.post('/products', requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       data: product,
-      message: isGoogleSheetsActive() ? 'Product created and persisted to Google Sheets' : 'Product created in local store',
+      message: 'Product created and persisted to Google Sheets',
     });
   } catch (err: any) {
     return res.status(400).json({
@@ -230,7 +272,7 @@ router.put('/products/:id', requireAuth, async (req: Request, res: Response) => 
     return res.json({
       success: true,
       data: updated,
-      message: isGoogleSheetsActive() ? 'Product updated and persisted to Google Sheets' : 'Product updated in local store',
+      message: 'Product updated and persisted to Google Sheets',
     });
   } catch (err: any) {
     return res.status(400).json({
@@ -268,19 +310,20 @@ router.get('/orders', requireAuth, async (req: Request, res: Response) => {
     const orders = await db.getOrders(fresh, correlationId);
     return res.json({ success: true, data: orders });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({ success: false, error: { code: 'DATABASE_ERROR', message: err.message } });
   }
 });
 
-router.get('/orders/:id', requireAuth, (req: Request, res: Response) => {
+router.get('/orders/:id', requireAuth, async (req: Request, res: Response) => {
+  const correlationId = (req as any).correlationId;
   try {
-    const order = db.getOrderById(req.params.id);
+    const order = await db.getOrderById(req.params.id, correlationId);
     if (!order) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Order not found' } });
     }
     return res.json({ success: true, data: order });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({ success: false, error: { code: 'DATABASE_ERROR', message: err.message } });
   }
 });
 
@@ -306,7 +349,7 @@ router.post('/orders', requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       data: order,
-      message: isGoogleSheetsActive() ? 'Order created and persisted to Google Sheets' : 'Order created in local store',
+      message: 'Order created and persisted to Google Sheets',
     });
   } catch (err: any) {
     return res.status(400).json({
@@ -329,7 +372,7 @@ router.put('/orders/:id', requireAuth, async (req: Request, res: Response) => {
     return res.json({
       success: true,
       data: updated,
-      message: isGoogleSheetsActive() ? 'Order updated and persisted to Google Sheets' : 'Order updated in local store',
+      message: 'Order updated and persisted to Google Sheets',
     });
   } catch (err: any) {
     return res.status(400).json({
@@ -349,7 +392,7 @@ router.delete('/orders/:id', requireAuth, async (req: Request, res: Response) =>
         error: { code: 'NOT_FOUND', message: 'Order not found' },
       });
     }
-    return res.json({ success: true, data: result, message: 'Order deleted successfully' });
+    return res.json({ success: true, data: result, message: 'Order deleted successfully from Google Sheets' });
   } catch (err: any) {
     return res.status(500).json({
       success: false,
@@ -367,7 +410,7 @@ router.get('/marketing', requireAuth, async (req: Request, res: Response) => {
     const marketing = await db.getMarketing(fresh, correlationId);
     return res.json({ success: true, data: marketing });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({ success: false, error: { code: 'DATABASE_ERROR', message: err.message } });
   }
 });
 
@@ -375,10 +418,10 @@ router.post('/marketing', requireAuth, async (req: Request, res: Response) => {
   const correlationId = (req as any).correlationId;
   try {
     const { month } = req.body;
-    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    if (!month) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Valid month (YYYY-MM) is required' },
+        error: { code: 'VALIDATION_ERROR', message: 'Month is required' },
       });
     }
 
@@ -386,7 +429,7 @@ router.post('/marketing', requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       data: record,
-      message: isGoogleSheetsActive() ? 'Marketing record persisted to Google Sheets' : 'Marketing record saved in local store',
+      message: 'Marketing record persisted to Google Sheets',
     });
   } catch (err: any) {
     return res.status(400).json({
@@ -406,7 +449,7 @@ router.put('/marketing/:id', requireAuth, async (req: Request, res: Response) =>
         error: { code: 'NOT_FOUND', message: 'Marketing record not found' },
       });
     }
-    return res.json({ success: true, data: updated, message: 'Marketing record updated' });
+    return res.json({ success: true, data: updated, message: 'Marketing record updated in Google Sheets' });
   } catch (err: any) {
     return res.status(400).json({
       success: false,
@@ -425,7 +468,7 @@ router.delete('/marketing/:id', requireAuth, async (req: Request, res: Response)
         error: { code: 'NOT_FOUND', message: 'Marketing record not found' },
       });
     }
-    return res.json({ success: true, data: result, message: 'Marketing record deleted' });
+    return res.json({ success: true, data: result, message: 'Marketing record deleted from Google Sheets' });
   } catch (err: any) {
     return res.status(500).json({
       success: false,
@@ -443,7 +486,7 @@ router.get('/targets', requireAuth, async (req: Request, res: Response) => {
     const targets = await db.getTargets(fresh, correlationId);
     return res.json({ success: true, data: targets });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({ success: false, error: { code: 'DATABASE_ERROR', message: err.message } });
   }
 });
 
@@ -462,7 +505,7 @@ router.post('/targets', requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       data: target,
-      message: isGoogleSheetsActive() ? 'Target persisted to Google Sheets' : 'Target saved in local store',
+      message: 'Target persisted to Google Sheets',
     });
   } catch (err: any) {
     return res.status(400).json({
@@ -482,7 +525,7 @@ router.put('/targets/:id', requireAuth, async (req: Request, res: Response) => {
         error: { code: 'NOT_FOUND', message: 'Target not found' },
       });
     }
-    return res.json({ success: true, data: updated, message: 'Target updated' });
+    return res.json({ success: true, data: updated, message: 'Target updated in Google Sheets' });
   } catch (err: any) {
     return res.status(400).json({
       success: false,
@@ -501,7 +544,7 @@ router.delete('/targets/:id', requireAuth, async (req: Request, res: Response) =
         error: { code: 'NOT_FOUND', message: 'Target not found' },
       });
     }
-    return res.json({ success: true, data: result, message: 'Target deleted' });
+    return res.json({ success: true, data: result, message: 'Target deleted from Google Sheets' });
   } catch (err: any) {
     return res.status(500).json({
       success: false,
@@ -512,10 +555,11 @@ router.delete('/targets/:id', requireAuth, async (req: Request, res: Response) =
 
 // ================= ANALYTICS & DASHBOARD =================
 
-router.get('/dashboard', requireAuth, (req: Request, res: Response) => {
+router.get('/dashboard', requireAuth, async (req: Request, res: Response) => {
+  const correlationId = (req as any).correlationId;
   try {
     const month = (req.query.month as string) || new Date().toISOString().substring(0, 7);
-    const all = db.getAll();
+    const all = await db.getAllAsync(false, correlationId);
 
     const metrics = calculateDashboardMetrics(
       month,
@@ -536,14 +580,22 @@ router.get('/dashboard', requireAuth, (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: err.code || 'DATABASE_UNAVAILABLE',
+        message: err.message || 'Google Sheets database unavailable',
+        isAuthError: Boolean(err.isAuthError),
+      },
+    });
   }
 });
 
-router.get('/performance', requireAuth, (req: Request, res: Response) => {
+router.get('/performance', requireAuth, async (req: Request, res: Response) => {
+  const correlationId = (req as any).correlationId;
   try {
     const year = (req.query.year as string) || '';
-    const all = db.getAll();
+    const all = await db.getAllAsync(false, correlationId);
 
     const performance = calculateMonthlyPerformance(
       all.Orders,
@@ -556,23 +608,42 @@ router.get('/performance', requireAuth, (req: Request, res: Response) => {
 
     return res.json({ success: true, data: performance });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
+    return res.status(503).json({
+      success: false,
+      error: {
+        code: err.code || 'DATABASE_UNAVAILABLE',
+        message: err.message || 'Google Sheets database unavailable',
+        isAuthError: Boolean(err.isAuthError),
+      },
+    });
   }
 });
 
 // ================= SETTINGS & GOOGLE SHEETS =================
 
-router.get('/settings', requireAuth, (req: Request, res: Response) => {
-  const settings = db.getSettings();
-  const syncMeta = getSyncMetadata();
+router.get('/settings', requireAuth, async (req: Request, res: Response) => {
+  const correlationId = (req as any).correlationId;
+  try {
+    const settings = await db.getSettings(correlationId);
+    const syncMeta = getSyncMetadata();
 
-  return res.json({
-    success: true,
-    data: {
-      settings,
-      googleSheetsIntegration: syncMeta,
-    },
-  });
+    return res.json({
+      success: true,
+      data: {
+        settings,
+        googleSheetsIntegration: syncMeta,
+      },
+    });
+  } catch (err: any) {
+    const syncMeta = getSyncMetadata();
+    return res.json({
+      success: true,
+      data: {
+        settings: [],
+        googleSheetsIntegration: syncMeta,
+      },
+    });
+  }
 });
 
 router.get('/sync/status', requireAuth, (req: Request, res: Response) => {
@@ -611,36 +682,6 @@ router.post('/sync/test-connection', requireAuth, async (req: Request, res: Resp
   }
 });
 
-router.post('/sync/push-to-sheets', requireAuth, async (req: Request, res: Response) => {
-  const correlationId = (req as any).correlationId;
-  try {
-    const all = db.getAll();
-    const result = await callGoogleAppsScript('batch_sync', all, undefined, undefined, correlationId);
-    
-    if (!result.connected) {
-      return res.status(result.httpStatus === 401 ? 401 : 400).json({
-        success: false,
-        error: {
-          code: result.error || 'SYNC_FAILED',
-          message: result.message || 'Failed to reach Apps Script',
-          isAuthError: Boolean(result.isAuthError),
-        },
-      });
-    }
-
-    return res.json({
-      success: true,
-      data: result.result,
-      message: 'Successfully synchronized all 7 tables to Google Sheets & Drive!',
-    });
-  } catch (err: any) {
-    return res.status(500).json({
-      success: false,
-      error: { code: 'SYNC_ERROR', message: err.message },
-    });
-  }
-});
-
 router.post('/sync/pull-from-sheets', requireAuth, async (req: Request, res: Response) => {
   const correlationId = (req as any).correlationId;
   try {
@@ -655,9 +696,10 @@ router.post('/sync/pull-from-sheets', requireAuth, async (req: Request, res: Res
       });
     }
 
+    const all = await db.getAllAsync(false, correlationId);
     return res.json({
       success: true,
-      data: db.getAll(),
+      data: all,
       message: 'Successfully pulled latest records from Google Sheets',
     });
   } catch (err: any) {
@@ -665,15 +707,6 @@ router.post('/sync/pull-from-sheets', requireAuth, async (req: Request, res: Res
       success: false,
       error: { code: 'PULL_ERROR', message: err.message },
     });
-  }
-});
-
-router.post('/seed/reset', requireAuth, (req: Request, res: Response) => {
-  try {
-    db.resetSeed();
-    return res.json({ success: true, message: 'Sample dataset reset successfully' });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: { code: 'RESET_FAILED', message: err.message } });
   }
 });
 

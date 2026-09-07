@@ -39,6 +39,8 @@ export interface OrderItem {
   product_id: string;
   quantity: number;
   unit_price: number; // Historical price captured at order creation
+  unit_cogs?: number; // Historical unit COGS (material + manufacturing + packaging)
+  unit_delivery_cost?: number; // Historical delivery cost
   created_at: string;
   product_name?: string;
   product_sku?: string;

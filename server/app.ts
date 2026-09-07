@@ -1,13 +1,9 @@
 import dotenv from 'dotenv';
 dotenv.config({ override: true });
 import express from 'express';
-import { initDb } from './db';
 import apiRoutes from './routes';
 
 export function createApp() {
-  // Initialize Database from local store / seed
-  initDb();
-
   const app = express();
 
   // Enable JSON request body parsing

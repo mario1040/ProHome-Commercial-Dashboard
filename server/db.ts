@@ -1,7 +1,4 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
-import { getInitialSeedData } from './seed';
 import { logStructured, logCrudOperation } from './logger';
 
 export interface DatabaseState {
@@ -14,18 +11,10 @@ export interface DatabaseState {
   Settings: any[];
 }
 
-const DATA_DIR = process.env.VERCEL ? '/tmp' : path.join(process.cwd(), 'data');
-const STORE_PATH = path.join(DATA_DIR, 'store.json');
-
-let inMemoryDb: DatabaseState = {
-  Users: [],
-  Products: [],
-  Orders: [],
-  Order_Items: [],
-  Marketing: [],
-  Targets: [],
-  Settings: [],
-};
+// In-memory state cache (short TTL) to optimize fast concurrent requests while keeping Google Sheets as the ONLY source of truth
+let liveCache: DatabaseState | null = null;
+let cacheExpiry: number = 0;
+const CACHE_TTL_MS = 3000; // 3-second cache TTL for responsive UI without stale business data
 
 let lastSyncTime: string | null = null;
 let lastSyncStatus: { success: boolean; message: string; timestamp: string } | null = null;
@@ -36,7 +25,7 @@ const DEFAULT_GAS_SECRET = 'AKfycbywe5GzyLoyW7VppCwe3bkfxhAQq37hSzjgbXYY9tN4LSJF
 export function getGasUrl(): string {
   const envUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
   if (envUrl && !envUrl.includes('LZFyTBOA') && !envUrl.includes('AKfycbxTG8')) {
-    return envUrl;
+    return envUrl.trim();
   }
   return DEFAULT_GAS_URL;
 }
@@ -44,7 +33,7 @@ export function getGasUrl(): string {
 export function getGasSecret(): string {
   const envSecret = process.env.GOOGLE_APPS_SCRIPT_SECRET;
   if (envSecret && !envSecret.includes('LZFyTBOA') && !envSecret.includes('AKfycbxTG8')) {
-    return envSecret;
+    return envSecret.trim();
   }
   return DEFAULT_GAS_SECRET;
 }
@@ -61,11 +50,46 @@ export const TABLE_SCHEMAS: Record<string, string[]> = {
     'is_active', 'created_at', 'updated_at'
   ],
   Orders: ['id', 'order_number', 'order_date', 'status', 'customer_name', 'customer_phone', 'notes', 'created_at', 'updated_at'],
-  Order_Items: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'created_at'],
+  Order_Items: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'unit_cogs', 'unit_delivery_cost', 'created_at'],
   Marketing: ['id', 'month', 'spend', 'orders_generated', 'revenue', 'created_at', 'updated_at'],
   Targets: ['id', 'month', 'sales_target', 'profit_margin_min', 'profit_margin_max', 'created_at', 'updated_at'],
   Settings: ['key', 'value', 'updated_at']
 };
+
+/**
+ * Cleanly normalizes Month to canonical YYYY-MM format
+ */
+export function normalizeMonth(val: any): string {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (/^\d{4}-\d{2}$/.test(str)) return str;
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 7);
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+  return str.substring(0, 7);
+}
+
+/**
+ * Cleanly normalizes Date to canonical YYYY-MM-DD format
+ */
+export function normalizeDate(val: any): string {
+  if (!val) return '';
+  const str = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  if (str.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10);
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return str.substring(0, 10);
+}
 
 export function normalizeRecord(tableName: string, raw: any): any {
   if (!raw || typeof raw !== 'object') return raw;
@@ -112,7 +136,7 @@ export function normalizeRecord(tableName: string, raw: any): any {
   } else if (tableName === 'Orders') {
     copy.id = String(copy.id || '');
     copy.order_number = String(copy.order_number || '');
-    copy.order_date = String(copy.order_date || '');
+    copy.order_date = normalizeDate(copy.order_date);
     copy.status = String(copy.status || 'Pending');
     copy.customer_name = String(copy.customer_name || '');
     copy.customer_phone = String(copy.customer_phone || '');
@@ -123,15 +147,23 @@ export function normalizeRecord(tableName: string, raw: any): any {
     copy.product_id = String(copy.product_id || '');
     copy.quantity = Math.max(1, Number(copy.quantity) || 1);
     copy.unit_price = Math.max(0, Number(copy.unit_price) || 0);
+    copy.unit_cogs =
+      copy.unit_cogs !== undefined && copy.unit_cogs !== null && !isNaN(Number(copy.unit_cogs))
+        ? Math.max(0, Number(copy.unit_cogs))
+        : undefined;
+    copy.unit_delivery_cost =
+      copy.unit_delivery_cost !== undefined && copy.unit_delivery_cost !== null && !isNaN(Number(copy.unit_delivery_cost))
+        ? Math.max(0, Number(copy.unit_delivery_cost))
+        : undefined;
   } else if (tableName === 'Marketing') {
     copy.id = String(copy.id || '');
-    copy.month = String(copy.month || '');
+    copy.month = normalizeMonth(copy.month);
     copy.spend = Math.max(0, Number(copy.spend) || 0);
     copy.orders_generated = Math.max(0, Number(copy.orders_generated) || 0);
     copy.revenue = Math.max(0, Number(copy.revenue) || 0);
   } else if (tableName === 'Targets') {
     copy.id = String(copy.id || '');
-    copy.month = String(copy.month || '');
+    copy.month = normalizeMonth(copy.month);
     copy.sales_target = Math.max(0, Number(copy.sales_target) || 0);
     copy.profit_margin_min = Number(copy.profit_margin_min) || 25;
     copy.profit_margin_max = Number(copy.profit_margin_max) || 30;
@@ -150,50 +182,13 @@ export function normalizeRecord(tableName: string, raw: any): any {
   return copy;
 }
 
-export function initDatabase() {
-  try {
-    if (fs.existsSync(STORE_PATH)) {
-      const data = fs.readFileSync(STORE_PATH, 'utf-8');
-      const parsed = JSON.parse(data);
-      if (parsed && Array.isArray(parsed.Users) && parsed.Users.length > 0) {
-        inMemoryDb = {
-          Users: parsed.Users || [],
-          Products: parsed.Products || [],
-          Orders: parsed.Orders || [],
-          Order_Items: parsed.Order_Items || [],
-          Marketing: parsed.Marketing || [],
-          Targets: parsed.Targets || [],
-          Settings: parsed.Settings || [],
-        };
-        console.log(`[DB] Loaded state from local store with ${inMemoryDb.Products.length} products, ${inMemoryDb.Orders.length} orders`);
-        return;
-      }
-    }
-  } catch (err) {
-    console.error('[DB] Error loading local store:', err);
-  }
-
-  // Idempotent initial seed
-  console.log('[DB] Seeding initial ProHome commercial database...');
-  inMemoryDb = getInitialSeedData();
-  saveDb();
-}
-
-export const initDb = initDatabase;
-
-export function saveDb() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(STORE_PATH, JSON.stringify(inMemoryDb, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('[DB] Failed saving store.json:', err);
-  }
-}
-
 export function generateId(prefix: string): string {
   return `${prefix}_${crypto.randomBytes(6).toString('hex')}`;
+}
+
+export function invalidateCache() {
+  liveCache = null;
+  cacheExpiry = 0;
 }
 
 export function getSyncMetadata() {
@@ -206,7 +201,7 @@ export function getSyncMetadata() {
   return {
     isConfigured: isUrlConfigured,
     hasSecret: isSecretConfigured,
-    persistenceMode: isConnected ? 'GOOGLE_SHEETS' : 'LOCAL_PERSISTENCE',
+    persistenceMode: isConnected ? 'GOOGLE_SHEETS' : 'ONLINE_GOOGLE_SHEETS_REQUIRED',
     lastSync: lastSyncTime,
     lastSyncStatus,
   };
@@ -367,149 +362,149 @@ export async function callGoogleAppsScript(
 }
 
 export const db = {
-  getAll(): DatabaseState {
-    return inMemoryDb;
-  },
+  /**
+   * Fetch all tables live from Google Sheets (with short TTL caching for rapid consecutive reads)
+   */
+  async getAllAsync(forceFresh: boolean = false, correlationId?: string): Promise<DatabaseState> {
+    const now = Date.now();
+    if (!forceFresh && liveCache && now < cacheExpiry) {
+      return liveCache;
+    }
 
-  async pullAllFromSheets(correlationId?: string): Promise<{ success: boolean; message: string }> {
     if (!isGoogleSheetsActive()) {
-      return { success: true, message: 'Google Sheets not configured; using local store' };
+      throw new Error('Google Sheets database connection is not configured. Google Sheets is required as the source of truth.');
     }
 
     const res = await callGoogleAppsScript('get_all', undefined, undefined, undefined, correlationId);
-    if (res.connected && res.result && typeof res.result === 'object') {
-      const sheetsData = res.result;
-      if (Array.isArray(sheetsData.Products) && sheetsData.Products.length > 0) {
-        inMemoryDb.Products = sheetsData.Products.map((p: any) => normalizeRecord('Products', p));
-      }
-      if (Array.isArray(sheetsData.Orders)) {
-        inMemoryDb.Orders = sheetsData.Orders.map((o: any) => normalizeRecord('Orders', o));
-      }
-      if (Array.isArray(sheetsData.Order_Items)) {
-        inMemoryDb.Order_Items = sheetsData.Order_Items.map((oi: any) => normalizeRecord('Order_Items', oi));
-      }
-      if (Array.isArray(sheetsData.Marketing)) {
-        inMemoryDb.Marketing = sheetsData.Marketing.map((m: any) => normalizeRecord('Marketing', m));
-      }
-      if (Array.isArray(sheetsData.Targets)) {
-        inMemoryDb.Targets = sheetsData.Targets.map((t: any) => normalizeRecord('Targets', t));
-      }
-      if (Array.isArray(sheetsData.Settings)) {
-        inMemoryDb.Settings = sheetsData.Settings.map((s: any) => normalizeRecord('Settings', s));
-      }
-      if (Array.isArray(sheetsData.Users) && sheetsData.Users.length > 0) {
-        inMemoryDb.Users = sheetsData.Users.map((u: any) => normalizeRecord('Users', u));
-      }
-      saveDb();
-      return { success: true, message: 'Successfully loaded database from Google Sheets' };
+    if (!res.connected || !res.result || typeof res.result !== 'object') {
+      const errMsg = res.message || 'Failed to fetch database from Google Sheets';
+      const isAuth = Boolean(res.isAuthError);
+      const err: any = new Error(errMsg);
+      err.isAuthError = isAuth;
+      err.code = res.error || 'DATABASE_UNAVAILABLE';
+      throw err;
     }
 
-    return { success: false, message: res.message || 'Failed to pull from Google Sheets' };
+    const sheetsData = res.result;
+    const newState: DatabaseState = {
+      Users: Array.isArray(sheetsData.Users) ? sheetsData.Users.map((u: any) => normalizeRecord('Users', u)) : [],
+      Products: Array.isArray(sheetsData.Products) ? sheetsData.Products.map((p: any) => normalizeRecord('Products', p)) : [],
+      Orders: Array.isArray(sheetsData.Orders) ? sheetsData.Orders.map((o: any) => normalizeRecord('Orders', o)) : [],
+      Order_Items: Array.isArray(sheetsData.Order_Items) ? sheetsData.Order_Items.map((oi: any) => normalizeRecord('Order_Items', oi)) : [],
+      Marketing: Array.isArray(sheetsData.Marketing) ? sheetsData.Marketing.map((m: any) => normalizeRecord('Marketing', m)) : [],
+      Targets: Array.isArray(sheetsData.Targets) ? sheetsData.Targets.map((t: any) => normalizeRecord('Targets', t)) : [],
+      Settings: Array.isArray(sheetsData.Settings) ? sheetsData.Settings.map((s: any) => normalizeRecord('Settings', s)) : [],
+    };
+
+    liveCache = newState;
+    cacheExpiry = Date.now() + CACHE_TTL_MS;
+    return newState;
   },
 
-  resetSeed() {
-    inMemoryDb = getInitialSeedData();
-    saveDb();
-    return inMemoryDb;
+  async pullAllFromSheets(correlationId?: string): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.getAllAsync(true, correlationId);
+      return { success: true, message: 'Successfully loaded database from Google Sheets' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to pull from Google Sheets' };
+    }
   },
 
   // Users
-  getUsers() {
-    return inMemoryDb.Users;
+  async getUsers(fresh: boolean = false, correlationId?: string) {
+    const all = await this.getAllAsync(fresh, correlationId);
+    return all.Users;
   },
 
-  getUserByUsername(username: string) {
+  async getUserByUsername(username: string, correlationId?: string) {
     if (!username) return undefined;
     const clean = username.trim().toLowerCase();
-    return inMemoryDb.Users.find(
+    const all = await this.getAllAsync(false, correlationId);
+    return all.Users.find(
       (u) =>
         (u.username && u.username.toLowerCase() === clean) ||
-        (u.email && u.email.toLowerCase() === clean) ||
-        (clean === 'jemyneutron228@gmail.com' && (u.role === 'admin' || u.username === 'admin')) ||
-        (clean === 'admin' && (u.username === 'admin' || u.role === 'admin'))
+        (u.email && u.email.toLowerCase() === clean)
     );
   },
 
-  getUserById(id: string) {
-    return inMemoryDb.Users.find((u) => u.id === id);
+  async getUserById(id: string, correlationId?: string) {
+    const all = await this.getAllAsync(false, correlationId);
+    return all.Users.find((u) => u.id === id);
   },
 
   async updateUser(id: string, updates: any, correlationId?: string) {
-    const idx = inMemoryDb.Users.findIndex((u) => u.id === id);
-    if (idx === -1) return null;
-    
+    const all = await this.getAllAsync(true, correlationId);
+    const user = all.Users.find((u) => u.id === id);
+    if (!user) return null;
+
     const updated = {
-      ...inMemoryDb.Users[idx],
+      ...user,
       ...updates,
       updated_at: new Date().toISOString(),
     };
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'UPDATE',
+      table: 'Users',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+    });
+
+    const res = await callGoogleAppsScript('update_record', updated, 'Users', id, correlationId);
+    const durationMs = Date.now() - startTime;
+
+    if (!res.connected || res.httpStatus !== 200) {
       logCrudOperation({
         correlationId,
         operation: 'UPDATE',
         table: 'Users',
         recordId: id,
         target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-      });
-
-      const res = await callGoogleAppsScript('update_record', updated, 'Users', id, correlationId);
-      const durationMs = Date.now() - startTime;
-
-      if (!res.connected || res.httpStatus !== 200) {
-        logCrudOperation({
-          correlationId,
-          operation: 'UPDATE',
-          table: 'Users',
-          recordId: id,
-          target: 'GOOGLE_SHEETS',
-          status: 'FAILED',
-          durationMs,
-        });
-        throw new Error(res.message || 'Failed to persist user update to Google Sheets');
-      }
-
-      logCrudOperation({
-        correlationId,
-        operation: 'UPDATE',
-        table: 'Users',
-        recordId: id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
+        status: 'FAILED',
         durationMs,
       });
+      throw new Error(res.message || 'Failed to persist user update to Google Sheets');
     }
 
-    inMemoryDb.Users[idx] = updated;
-    saveDb();
-    return inMemoryDb.Users[idx];
+    logCrudOperation({
+      correlationId,
+      operation: 'UPDATE',
+      table: 'Users',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
+    return updated;
   },
 
   // Products
   async getProducts(freshFromSheets: boolean = false, correlationId?: string) {
-    if (freshFromSheets && isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('get_resource', undefined, 'Products', undefined, correlationId);
-      if (res.connected && Array.isArray(res.result)) {
-        inMemoryDb.Products = res.result.map((p: any) => normalizeRecord('Products', p));
-        saveDb();
-      }
-    }
-    return inMemoryDb.Products;
+    const all = await this.getAllAsync(freshFromSheets, correlationId);
+    return all.Products;
   },
 
-  getProductById(id: string) {
-    return inMemoryDb.Products.find((p) => p.id === id);
+  async getProductById(id: string, correlationId?: string) {
+    const all = await this.getAllAsync(false, correlationId);
+    return all.Products.find((p) => p.id === id);
   },
 
-  getProductBySku(sku: string) {
+  async getProductBySku(sku: string, correlationId?: string) {
     if (!sku) return undefined;
-    return inMemoryDb.Products.find((p) => (p.sku || '').trim().toLowerCase() === sku.trim().toLowerCase());
+    const all = await this.getAllAsync(false, correlationId);
+    return all.Products.find((p) => (p.sku || '').trim().toLowerCase() === sku.trim().toLowerCase());
   },
 
   async createProduct(data: any, correlationId?: string) {
-    const existingSku = this.getProductBySku(data.sku);
+    const all = await this.getAllAsync(true, correlationId);
+    const existingSku = all.Products.find(
+      (p) => (p.sku || '').trim().toLowerCase() === String(data.sku || '').trim().toLowerCase()
+    );
     if (existingSku) {
       throw new Error(`A product with SKU "${data.sku}" already exists`);
     }
@@ -531,73 +526,62 @@ export const db = {
       updated_at: now,
     };
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Products',
+      recordId: newProduct.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+      message: `Writing new product "${newProduct.name}" (${newProduct.sku}) to Google Sheets`,
+    });
+
+    const res = await callGoogleAppsScript('create_record', newProduct, 'Products', newProduct.id, correlationId);
+    const durationMs = Date.now() - startTime;
+
+    if (!res.connected || res.httpStatus !== 200) {
       logCrudOperation({
         correlationId,
         operation: 'CREATE',
         table: 'Products',
         recordId: newProduct.id,
         target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-        message: `Writing new product "${newProduct.name}" (${newProduct.sku}) to Google Sheets`,
-      });
-
-      const res = await callGoogleAppsScript('create_record', newProduct, 'Products', newProduct.id, correlationId);
-      const durationMs = Date.now() - startTime;
-
-      if (!res.connected || res.httpStatus !== 200) {
-        logCrudOperation({
-          correlationId,
-          operation: 'CREATE',
-          table: 'Products',
-          recordId: newProduct.id,
-          target: 'GOOGLE_SHEETS',
-          status: 'FAILED',
-          durationMs,
-          message: res.message,
-        });
-        throw new Error(res.message || 'Failed to persist product to Google Sheets');
-      }
-
-      logCrudOperation({
-        correlationId,
-        operation: 'CREATE',
-        table: 'Products',
-        recordId: newProduct.id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
+        status: 'FAILED',
         durationMs,
-        message: `Product "${newProduct.name}" persisted to Google Sheets in ${durationMs}ms`,
+        message: res.message,
       });
-    } else {
-      logCrudOperation({
-        correlationId,
-        operation: 'CREATE',
-        table: 'Products',
-        recordId: newProduct.id,
-        target: 'LOCAL_STORE',
-        status: 'SUCCESS',
-      });
+      throw new Error(res.message || 'Failed to persist product to Google Sheets');
     }
 
-    inMemoryDb.Products.push(newProduct);
-    saveDb();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Products',
+      recordId: newProduct.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
     return newProduct;
   },
 
   async updateProduct(id: string, data: any, correlationId?: string) {
-    const idx = inMemoryDb.Products.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const current = all.Products.find((p) => p.id === id);
+    if (!current) return null;
 
     if (data.sku) {
-      const existingSku = this.getProductBySku(data.sku);
-      if (existingSku && existingSku.id !== id) {
+      const existingSku = all.Products.find(
+        (p) => p.id !== id && (p.sku || '').trim().toLowerCase() === String(data.sku).trim().toLowerCase()
+      );
+      if (existingSku) {
         throw new Error(`A product with SKU "${data.sku}" already exists`);
       }
     }
 
-    const current = inMemoryDb.Products[idx];
     const updatedProduct = {
       ...current,
       name: data.name !== undefined ? String(data.name).trim() : current.name,
@@ -613,25 +597,82 @@ export const db = {
       updated_at: new Date().toISOString(),
     };
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'UPDATE',
+      table: 'Products',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+      message: `Updating product "${updatedProduct.name}" in Google Sheets`,
+    });
+
+    const res = await callGoogleAppsScript('update_record', updatedProduct, 'Products', id, correlationId);
+    const durationMs = Date.now() - startTime;
+
+    if (!res.connected || res.httpStatus !== 200) {
       logCrudOperation({
         correlationId,
         operation: 'UPDATE',
         table: 'Products',
         recordId: id,
         target: 'GOOGLE_SHEETS',
+        status: 'FAILED',
+        durationMs,
+        message: res.message,
+      });
+      throw new Error(res.message || 'Failed to persist product update to Google Sheets');
+    }
+
+    logCrudOperation({
+      correlationId,
+      operation: 'UPDATE',
+      table: 'Products',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
+    return updatedProduct;
+  },
+
+  async deleteProduct(id: string, correlationId?: string) {
+    const all = await this.getAllAsync(true, correlationId);
+    const product = all.Products.find((p) => p.id === id);
+    if (!product) return null;
+
+    // Check if product is referenced in historical order items
+    const isUsedInOrders = all.Order_Items.some((item) => item.product_id === id);
+
+    if (isUsedInOrders) {
+      // RULE: For products used in historical orders, deactivate in Google Sheets
+      const updated = {
+        ...product,
+        is_active: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      const startTime = Date.now();
+      logCrudOperation({
+        correlationId,
+        operation: 'DEACTIVATE',
+        table: 'Products',
+        recordId: id,
+        target: 'GOOGLE_SHEETS',
         status: 'PENDING',
-        message: `Updating product "${updatedProduct.name}" in Google Sheets`,
+        message: 'Product referenced by orders; deactivating in Google Sheets',
       });
 
-      const res = await callGoogleAppsScript('update_record', updatedProduct, 'Products', id, correlationId);
+      const res = await callGoogleAppsScript('update_record', { is_active: false }, 'Products', id, correlationId);
       const durationMs = Date.now() - startTime;
 
       if (!res.connected || res.httpStatus !== 200) {
         logCrudOperation({
           correlationId,
-          operation: 'UPDATE',
+          operation: 'DEACTIVATE',
           table: 'Products',
           recordId: id,
           target: 'GOOGLE_SHEETS',
@@ -639,155 +680,71 @@ export const db = {
           durationMs,
           message: res.message,
         });
-        throw new Error(res.message || 'Failed to persist product update to Google Sheets');
+        throw new Error(res.message || 'Failed to deactivate product in Google Sheets');
       }
 
       logCrudOperation({
         correlationId,
-        operation: 'UPDATE',
+        operation: 'DEACTIVATE',
         table: 'Products',
         recordId: id,
         target: 'GOOGLE_SHEETS',
         status: 'SUCCESS',
         durationMs,
       });
-    } else {
-      logCrudOperation({
-        correlationId,
-        operation: 'UPDATE',
-        table: 'Products',
-        recordId: id,
-        target: 'LOCAL_STORE',
-        status: 'SUCCESS',
-      });
-    }
 
-    inMemoryDb.Products[idx] = updatedProduct;
-    saveDb();
-    return inMemoryDb.Products[idx];
-  },
-
-  async deleteProduct(id: string, correlationId?: string) {
-    const idx = inMemoryDb.Products.findIndex((p) => p.id === id);
-    if (idx === -1) return null;
-
-    // Check if product is referenced in historical orders
-    const isUsedInOrders = inMemoryDb.Order_Items.some((item) => item.product_id === id);
-
-    if (isUsedInOrders) {
-      // RULE: For products used in historical orders, deactivate in Google Sheets
-      const updated = {
-        ...inMemoryDb.Products[idx],
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (isGoogleSheetsActive()) {
-        const startTime = Date.now();
-        logCrudOperation({
-          correlationId,
-          operation: 'DEACTIVATE',
-          table: 'Products',
-          recordId: id,
-          target: 'GOOGLE_SHEETS',
-          status: 'PENDING',
-          message: 'Product referenced by orders; deactivating in Google Sheets',
-        });
-
-        const res = await callGoogleAppsScript('update_record', { is_active: false }, 'Products', id, correlationId);
-        const durationMs = Date.now() - startTime;
-
-        if (!res.connected || res.httpStatus !== 200) {
-          logCrudOperation({
-            correlationId,
-            operation: 'DEACTIVATE',
-            table: 'Products',
-            recordId: id,
-            target: 'GOOGLE_SHEETS',
-            status: 'FAILED',
-            durationMs,
-            message: res.message,
-          });
-          throw new Error(res.message || 'Failed to deactivate product in Google Sheets');
-        }
-
-        logCrudOperation({
-          correlationId,
-          operation: 'DEACTIVATE',
-          table: 'Products',
-          recordId: id,
-          target: 'GOOGLE_SHEETS',
-          status: 'SUCCESS',
-          durationMs,
-        });
-      }
-
-      inMemoryDb.Products[idx] = updated;
-      saveDb();
+      invalidateCache();
       return { id, deactivated: true, message: 'Product is used in existing orders and has been deactivated in Google Sheets.' };
     } else {
-      if (isGoogleSheetsActive()) {
-        const startTime = Date.now();
+      const startTime = Date.now();
+      logCrudOperation({
+        correlationId,
+        operation: 'DELETE',
+        table: 'Products',
+        recordId: id,
+        target: 'GOOGLE_SHEETS',
+        status: 'PENDING',
+      });
+
+      const res = await callGoogleAppsScript('delete_record', undefined, 'Products', id, correlationId);
+      const durationMs = Date.now() - startTime;
+
+      if (!res.connected || res.httpStatus !== 200) {
         logCrudOperation({
           correlationId,
           operation: 'DELETE',
           table: 'Products',
           recordId: id,
           target: 'GOOGLE_SHEETS',
-          status: 'PENDING',
-        });
-
-        const res = await callGoogleAppsScript('delete_record', undefined, 'Products', id, correlationId);
-        const durationMs = Date.now() - startTime;
-
-        if (!res.connected || res.httpStatus !== 200) {
-          logCrudOperation({
-            correlationId,
-            operation: 'DELETE',
-            table: 'Products',
-            recordId: id,
-            target: 'GOOGLE_SHEETS',
-            status: 'FAILED',
-            durationMs,
-            message: res.message,
-          });
-          throw new Error(res.message || 'Failed to delete product from Google Sheets');
-        }
-
-        logCrudOperation({
-          correlationId,
-          operation: 'DELETE',
-          table: 'Products',
-          recordId: id,
-          target: 'GOOGLE_SHEETS',
-          status: 'SUCCESS',
+          status: 'FAILED',
           durationMs,
+          message: res.message,
         });
+        throw new Error(res.message || 'Failed to delete product from Google Sheets');
       }
 
-      const removed = inMemoryDb.Products.splice(idx, 1)[0];
-      saveDb();
-      return { id: removed.id, deleted: true };
+      logCrudOperation({
+        correlationId,
+        operation: 'DELETE',
+        table: 'Products',
+        recordId: id,
+        target: 'GOOGLE_SHEETS',
+        status: 'SUCCESS',
+        durationMs,
+      });
+
+      invalidateCache();
+      return { id, deleted: true };
     }
   },
 
   // Orders
   async getOrders(freshFromSheets: boolean = false, correlationId?: string) {
-    if (freshFromSheets && isGoogleSheetsActive()) {
-      const resOrders = await callGoogleAppsScript('get_resource', undefined, 'Orders', undefined, correlationId);
-      const resItems = await callGoogleAppsScript('get_resource', undefined, 'Order_Items', undefined, correlationId);
-      if (resOrders.connected && Array.isArray(resOrders.result)) {
-        inMemoryDb.Orders = resOrders.result.map((o: any) => normalizeRecord('Orders', o));
-      }
-      if (resItems.connected && Array.isArray(resItems.result)) {
-        inMemoryDb.Order_Items = resItems.result.map((oi: any) => normalizeRecord('Order_Items', oi));
-      }
-      saveDb();
-    }
+    const all = await this.getAllAsync(freshFromSheets, correlationId);
+    const productMap = new Map<string, any>(all.Products.map((p) => [p.id, p]));
 
-    const productMap = new Map(inMemoryDb.Products.map((p) => [p.id, p]));
-    return inMemoryDb.Orders.map((order) => {
-      const items = inMemoryDb.Order_Items.filter((it) => it.order_id === order.id).map((it) => {
+    return all.Orders.map((order) => {
+      const items = all.Order_Items.filter((it) => it.order_id === order.id).map((it) => {
         const prod = productMap.get(it.product_id);
         return {
           ...it,
@@ -807,12 +764,13 @@ export const db = {
     });
   },
 
-  getOrderById(id: string) {
-    const order = inMemoryDb.Orders.find((o) => o.id === id);
+  async getOrderById(id: string, correlationId?: string) {
+    const all = await this.getAllAsync(false, correlationId);
+    const order = all.Orders.find((o) => o.id === id);
     if (!order) return null;
 
-    const productMap = new Map(inMemoryDb.Products.map((p) => [p.id, p]));
-    const items = inMemoryDb.Order_Items.filter((it) => it.order_id === order.id).map((it) => {
+    const productMap = new Map<string, any>(all.Products.map((p) => [p.id, p]));
+    const items = all.Order_Items.filter((it) => it.order_id === order.id).map((it) => {
       const prod = productMap.get(it.product_id);
       return {
         ...it,
@@ -832,19 +790,20 @@ export const db = {
   },
 
   async createOrder(data: any, correlationId?: string) {
+    const all = await this.getAllAsync(true, correlationId);
     const now = new Date().toISOString();
     const orderId = generateId('ord');
 
     if (!data.order_number) {
       const datePart = (data.order_date || now.substring(0, 10)).replace(/-/g, '').substring(0, 6);
-      const count = inMemoryDb.Orders.length + 1;
+      const count = all.Orders.length + 1;
       data.order_number = `PH-${datePart}-${String(count).padStart(3, '0')}`;
     }
 
     const newOrder = {
       id: orderId,
       order_number: String(data.order_number).trim(),
-      order_date: String(data.order_date || now.substring(0, 10)).trim(),
+      order_date: normalizeDate(data.order_date || now.substring(0, 10)),
       status: data.status || 'Pending',
       customer_name: String(data.customer_name || '').trim(),
       customer_phone: String(data.customer_phone || '').trim(),
@@ -853,24 +812,33 @@ export const db = {
       updated_at: now,
     };
 
-    // Prepare order items
+    // Prepare order items with historical costing snapshot
     const newItems: any[] = [];
     const createdItemsWithMeta: any[] = [];
 
     if (Array.isArray(data.items) && data.items.length > 0) {
       for (const item of data.items) {
-        const prod = inMemoryDb.Products.find((p) => p.id === item.product_id);
+        const prod = all.Products.find((p) => p.id === item.product_id);
         if (!prod) {
           throw new Error(`Product not found for ID: ${item.product_id}`);
         }
 
-        const unitPrice = item.unit_price !== undefined ? Number(item.unit_price) : Number(prod.selling_price);
+        const unitPrice = item.unit_price !== undefined && !isNaN(Number(item.unit_price))
+          ? Number(item.unit_price)
+          : Number(prod.selling_price);
+
+        // Historical unit COGS = material + manufacturing + packaging
+        const unitCOGS = (Number(prod.material_cost) || 0) + (Number(prod.manufacturing_cost) || 0) + (Number(prod.packaging_cost) || 0);
+        const unitDelivery = Number(prod.delivery_cost) || 0;
+
         const newItem = {
           id: generateId('item'),
           order_id: orderId,
           product_id: item.product_id,
           quantity: Math.max(1, Number(item.quantity) || 1),
           unit_price: Math.max(0, unitPrice),
+          unit_cogs: unitCOGS,
+          unit_delivery_cost: unitDelivery,
           created_at: now,
         };
 
@@ -883,46 +851,42 @@ export const db = {
       }
     }
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
-      logCrudOperation({
-        correlationId,
-        operation: 'CREATE',
-        table: 'Orders',
-        recordId: newOrder.id,
-        target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-      });
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Orders',
+      recordId: newOrder.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+    });
 
-      // Write Order
-      const resOrder = await callGoogleAppsScript('create_record', newOrder, 'Orders', newOrder.id, correlationId);
-      if (!resOrder.connected || resOrder.httpStatus !== 200) {
-        throw new Error(resOrder.message || 'Failed to write Order to Google Sheets');
-      }
-
-      // Write Order Items
-      for (const item of newItems) {
-        const resItem = await callGoogleAppsScript('create_record', item, 'Order_Items', item.id, correlationId);
-        if (!resItem.connected || resItem.httpStatus !== 200) {
-          throw new Error(resItem.message || 'Failed to write Order_Item to Google Sheets');
-        }
-      }
-
-      const durationMs = Date.now() - startTime;
-      logCrudOperation({
-        correlationId,
-        operation: 'CREATE',
-        table: 'Orders',
-        recordId: newOrder.id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
-        durationMs,
-      });
+    // Write Order header to Google Sheets
+    const resOrder = await callGoogleAppsScript('create_record', newOrder, 'Orders', newOrder.id, correlationId);
+    if (!resOrder.connected || resOrder.httpStatus !== 200) {
+      throw new Error(resOrder.message || 'Failed to write Order to Google Sheets');
     }
 
-    inMemoryDb.Orders.push(newOrder);
-    inMemoryDb.Order_Items.push(...newItems);
-    saveDb();
+    // Write each Order Item to Google Sheets
+    for (const item of newItems) {
+      const resItem = await callGoogleAppsScript('create_record', item, 'Order_Items', item.id, correlationId);
+      if (!resItem.connected || resItem.httpStatus !== 200) {
+        throw new Error(resItem.message || 'Failed to write Order_Item to Google Sheets');
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Orders',
+      recordId: newOrder.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
 
     return {
       ...newOrder,
@@ -932,14 +896,14 @@ export const db = {
   },
 
   async updateOrder(id: string, data: any, correlationId?: string) {
-    const idx = inMemoryDb.Orders.findIndex((o) => o.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const current = all.Orders.find((o) => o.id === id);
+    if (!current) return null;
 
-    const current = inMemoryDb.Orders[idx];
     const updatedOrder = {
       ...current,
       order_number: data.order_number !== undefined ? String(data.order_number).trim() : current.order_number,
-      order_date: data.order_date !== undefined ? String(data.order_date).trim() : current.order_date,
+      order_date: data.order_date !== undefined ? normalizeDate(data.order_date) : current.order_date,
       status: data.status !== undefined ? data.status : current.status,
       customer_name: data.customer_name !== undefined ? String(data.customer_name).trim() : current.customer_name,
       customer_phone: data.customer_phone !== undefined ? String(data.customer_phone).trim() : current.customer_phone,
@@ -947,94 +911,139 @@ export const db = {
       updated_at: new Date().toISOString(),
     };
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
-      logCrudOperation({
-        correlationId,
-        operation: 'UPDATE',
-        table: 'Orders',
-        recordId: id,
-        target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-      });
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'UPDATE',
+      table: 'Orders',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+    });
 
-      const res = await callGoogleAppsScript('update_record', updatedOrder, 'Orders', id, correlationId);
-      if (!res.connected || res.httpStatus !== 200) {
-        throw new Error(res.message || 'Failed to update order in Google Sheets');
-      }
-
-      const durationMs = Date.now() - startTime;
-      logCrudOperation({
-        correlationId,
-        operation: 'UPDATE',
-        table: 'Orders',
-        recordId: id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
-        durationMs,
-      });
+    // 1. Update Order Header
+    const res = await callGoogleAppsScript('update_record', updatedOrder, 'Orders', id, correlationId);
+    if (!res.connected || res.httpStatus !== 200) {
+      throw new Error(res.message || 'Failed to update order in Google Sheets');
     }
 
-    inMemoryDb.Orders[idx] = updatedOrder;
-    saveDb();
-    return this.getOrderById(id);
+    // 2. Reconcile Order Items if provided in payload
+    if (Array.isArray(data.items)) {
+      const existingItems = all.Order_Items.filter((it) => it.order_id === id);
+      const incomingItems = data.items;
+
+      // Map incoming items
+      for (const item of incomingItems) {
+        const prod = all.Products.find((p) => p.id === item.product_id);
+        const unitPrice = item.unit_price !== undefined ? Number(item.unit_price) : (prod ? Number(prod.selling_price) : 0);
+        const unitCOGS = prod ? (Number(prod.material_cost) || 0) + (Number(prod.manufacturing_cost) || 0) + (Number(prod.packaging_cost) || 0) : 0;
+        const unitDelivery = prod ? Number(prod.delivery_cost) || 0 : 0;
+
+        if (item.id && existingItems.some((ex) => ex.id === item.id)) {
+          // Update existing item
+          const updatedItem = {
+            id: item.id,
+            order_id: id,
+            product_id: item.product_id,
+            quantity: Math.max(1, Number(item.quantity) || 1),
+            unit_price: Math.max(0, unitPrice),
+            unit_cogs: unitCOGS,
+            unit_delivery_cost: unitDelivery,
+          };
+          await callGoogleAppsScript('update_record', updatedItem, 'Order_Items', item.id, correlationId);
+        } else {
+          // Create new line item
+          const newItem = {
+            id: generateId('item'),
+            order_id: id,
+            product_id: item.product_id,
+            quantity: Math.max(1, Number(item.quantity) || 1),
+            unit_price: Math.max(0, unitPrice),
+            unit_cogs: unitCOGS,
+            unit_delivery_cost: unitDelivery,
+            created_at: new Date().toISOString(),
+          };
+          await callGoogleAppsScript('create_record', newItem, 'Order_Items', newItem.id, correlationId);
+        }
+      }
+
+      // Delete removed items
+      const incomingItemIds = new Set(incomingItems.filter((it: any) => it.id).map((it: any) => it.id));
+      for (const ex of existingItems) {
+        if (!incomingItemIds.has(ex.id)) {
+          await callGoogleAppsScript('delete_record', undefined, 'Order_Items', ex.id, correlationId);
+        }
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+    logCrudOperation({
+      correlationId,
+      operation: 'UPDATE',
+      table: 'Orders',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
+    return this.getOrderById(id, correlationId);
   },
 
   async deleteOrder(id: string, correlationId?: string) {
-    const idx = inMemoryDb.Orders.findIndex((o) => o.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const order = all.Orders.find((o) => o.id === id);
+    if (!order) return null;
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
-      logCrudOperation({
-        correlationId,
-        operation: 'DELETE',
-        table: 'Orders',
-        recordId: id,
-        target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-      });
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'DELETE',
+      table: 'Orders',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+    });
 
-      const res = await callGoogleAppsScript('delete_record', undefined, 'Orders', id, correlationId);
-      if (!res.connected || res.httpStatus !== 200) {
-        throw new Error(res.message || 'Failed to delete order from Google Sheets');
-      }
-
-      const durationMs = Date.now() - startTime;
-      logCrudOperation({
-        correlationId,
-        operation: 'DELETE',
-        table: 'Orders',
-        recordId: id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
-        durationMs,
-      });
+    // 1. Delete Order header
+    const res = await callGoogleAppsScript('delete_record', undefined, 'Orders', id, correlationId);
+    if (!res.connected || res.httpStatus !== 200) {
+      throw new Error(res.message || 'Failed to delete order from Google Sheets');
     }
 
-    inMemoryDb.Orders.splice(idx, 1);
-    inMemoryDb.Order_Items = inMemoryDb.Order_Items.filter((it) => it.order_id !== id);
-    saveDb();
+    // 2. Delete all associated Order_Items
+    const orderItems = all.Order_Items.filter((it) => it.order_id === id);
+    for (const item of orderItems) {
+      await callGoogleAppsScript('delete_record', undefined, 'Order_Items', item.id, correlationId).catch(() => {});
+    }
+
+    const durationMs = Date.now() - startTime;
+    logCrudOperation({
+      correlationId,
+      operation: 'DELETE',
+      table: 'Orders',
+      recordId: id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
     return { id, deleted: true };
   },
 
   // Marketing
   async getMarketing(freshFromSheets: boolean = false, correlationId?: string) {
-    if (freshFromSheets && isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('get_resource', undefined, 'Marketing', undefined, correlationId);
-      if (res.connected && Array.isArray(res.result)) {
-        inMemoryDb.Marketing = res.result.map((m: any) => normalizeRecord('Marketing', m));
-        saveDb();
-      }
-    }
-    return inMemoryDb.Marketing;
+    const all = await this.getAllAsync(freshFromSheets, correlationId);
+    return all.Marketing;
   },
 
   async createMarketing(data: any, correlationId?: string) {
     const now = new Date().toISOString();
     const newRecord = {
       id: generateId('mkt'),
-      month: String(data.month).trim(),
+      month: normalizeMonth(data.month),
       spend: Math.max(0, Number(data.spend) || 0),
       orders_generated: Math.max(0, Number(data.orders_generated) || 0),
       revenue: Math.max(0, Number(data.revenue) || 0),
@@ -1042,108 +1051,94 @@ export const db = {
       updated_at: now,
     };
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Marketing',
+      recordId: newRecord.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+    });
+
+    const res = await callGoogleAppsScript('create_record', newRecord, 'Marketing', newRecord.id, correlationId);
+    const durationMs = Date.now() - startTime;
+
+    if (!res.connected || res.httpStatus !== 200) {
       logCrudOperation({
         correlationId,
         operation: 'CREATE',
         table: 'Marketing',
         recordId: newRecord.id,
         target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-      });
-
-      const res = await callGoogleAppsScript('create_record', newRecord, 'Marketing', newRecord.id, correlationId);
-      const durationMs = Date.now() - startTime;
-
-      if (!res.connected || res.httpStatus !== 200) {
-        logCrudOperation({
-          correlationId,
-          operation: 'CREATE',
-          table: 'Marketing',
-          recordId: newRecord.id,
-          target: 'GOOGLE_SHEETS',
-          status: 'FAILED',
-          durationMs,
-        });
-        throw new Error(res.message || 'Failed to write marketing record to Google Sheets');
-      }
-
-      logCrudOperation({
-        correlationId,
-        operation: 'CREATE',
-        table: 'Marketing',
-        recordId: newRecord.id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
+        status: 'FAILED',
         durationMs,
       });
+      throw new Error(res.message || 'Failed to write marketing record to Google Sheets');
     }
 
-    inMemoryDb.Marketing.push(newRecord);
-    saveDb();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Marketing',
+      recordId: newRecord.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
     return newRecord;
   },
 
   async updateMarketing(id: string, data: any, correlationId?: string) {
-    const idx = inMemoryDb.Marketing.findIndex((m) => m.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const current = all.Marketing.find((m) => m.id === id);
+    if (!current) return null;
 
-    const current = inMemoryDb.Marketing[idx];
     const updated = {
       ...current,
-      month: data.month !== undefined ? String(data.month).trim() : current.month,
+      month: data.month !== undefined ? normalizeMonth(data.month) : current.month,
       spend: data.spend !== undefined ? Math.max(0, Number(data.spend) || 0) : current.spend,
       orders_generated: data.orders_generated !== undefined ? Math.max(0, Number(data.orders_generated) || 0) : current.orders_generated,
       revenue: data.revenue !== undefined ? Math.max(0, Number(data.revenue) || 0) : current.revenue,
       updated_at: new Date().toISOString(),
     };
 
-    if (isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('update_record', updated, 'Marketing', id, correlationId);
-      if (!res.connected || res.httpStatus !== 200) {
-        throw new Error(res.message || 'Failed to update marketing record in Google Sheets');
-      }
+    const res = await callGoogleAppsScript('update_record', updated, 'Marketing', id, correlationId);
+    if (!res.connected || res.httpStatus !== 200) {
+      throw new Error(res.message || 'Failed to update marketing record in Google Sheets');
     }
 
-    inMemoryDb.Marketing[idx] = updated;
-    saveDb();
-    return inMemoryDb.Marketing[idx];
+    invalidateCache();
+    return updated;
   },
 
   async deleteMarketing(id: string, correlationId?: string) {
-    const idx = inMemoryDb.Marketing.findIndex((m) => m.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const item = all.Marketing.find((m) => m.id === id);
+    if (!item) return null;
 
-    if (isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('delete_record', undefined, 'Marketing', id, correlationId);
-      if (!res.connected || res.httpStatus !== 200) {
-        throw new Error(res.message || 'Failed to delete marketing record from Google Sheets');
-      }
+    const res = await callGoogleAppsScript('delete_record', undefined, 'Marketing', id, correlationId);
+    if (!res.connected || res.httpStatus !== 200) {
+      throw new Error(res.message || 'Failed to delete marketing record from Google Sheets');
     }
 
-    inMemoryDb.Marketing.splice(idx, 1);
-    saveDb();
+    invalidateCache();
     return { id, deleted: true };
   },
 
   // Targets
   async getTargets(freshFromSheets: boolean = false, correlationId?: string) {
-    if (freshFromSheets && isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('get_resource', undefined, 'Targets', undefined, correlationId);
-      if (res.connected && Array.isArray(res.result)) {
-        inMemoryDb.Targets = res.result.map((t: any) => normalizeRecord('Targets', t));
-        saveDb();
-      }
-    }
-    return inMemoryDb.Targets;
+    const all = await this.getAllAsync(freshFromSheets, correlationId);
+    return all.Targets;
   },
 
   async createTarget(data: any, correlationId?: string) {
     const now = new Date().toISOString();
     const newTarget = {
       id: generateId('tgt'),
-      month: String(data.month).trim(),
+      month: normalizeMonth(data.month),
       sales_target: Math.max(0, Number(data.sales_target) || 0),
       profit_margin_min: Number(data.profit_margin_min) || 25,
       profit_margin_max: Number(data.profit_margin_max) || 30,
@@ -1151,115 +1146,102 @@ export const db = {
       updated_at: now,
     };
 
-    if (isGoogleSheetsActive()) {
-      const startTime = Date.now();
+    const startTime = Date.now();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Targets',
+      recordId: newTarget.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'PENDING',
+    });
+
+    const res = await callGoogleAppsScript('create_record', newTarget, 'Targets', newTarget.id, correlationId);
+    const durationMs = Date.now() - startTime;
+
+    if (!res.connected || res.httpStatus !== 200) {
       logCrudOperation({
         correlationId,
         operation: 'CREATE',
         table: 'Targets',
         recordId: newTarget.id,
         target: 'GOOGLE_SHEETS',
-        status: 'PENDING',
-      });
-
-      const res = await callGoogleAppsScript('create_record', newTarget, 'Targets', newTarget.id, correlationId);
-      const durationMs = Date.now() - startTime;
-
-      if (!res.connected || res.httpStatus !== 200) {
-        logCrudOperation({
-          correlationId,
-          operation: 'CREATE',
-          table: 'Targets',
-          recordId: newTarget.id,
-          target: 'GOOGLE_SHEETS',
-          status: 'FAILED',
-          durationMs,
-        });
-        throw new Error(res.message || 'Failed to write target to Google Sheets');
-      }
-
-      logCrudOperation({
-        correlationId,
-        operation: 'CREATE',
-        table: 'Targets',
-        recordId: newTarget.id,
-        target: 'GOOGLE_SHEETS',
-        status: 'SUCCESS',
+        status: 'FAILED',
         durationMs,
       });
+      throw new Error(res.message || 'Failed to write target to Google Sheets');
     }
 
-    inMemoryDb.Targets.push(newTarget);
-    saveDb();
+    logCrudOperation({
+      correlationId,
+      operation: 'CREATE',
+      table: 'Targets',
+      recordId: newTarget.id,
+      target: 'GOOGLE_SHEETS',
+      status: 'SUCCESS',
+      durationMs,
+    });
+
+    invalidateCache();
     return newTarget;
   },
 
   async updateTarget(id: string, data: any, correlationId?: string) {
-    const idx = inMemoryDb.Targets.findIndex((t) => t.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const current = all.Targets.find((t) => t.id === id);
+    if (!current) return null;
 
-    const current = inMemoryDb.Targets[idx];
     const updated = {
       ...current,
-      month: data.month !== undefined ? String(data.month).trim() : current.month,
+      month: data.month !== undefined ? normalizeMonth(data.month) : current.month,
       sales_target: data.sales_target !== undefined ? Math.max(0, Number(data.sales_target) || 0) : current.sales_target,
       profit_margin_min: data.profit_margin_min !== undefined ? Number(data.profit_margin_min) : current.profit_margin_min,
       profit_margin_max: data.profit_margin_max !== undefined ? Number(data.profit_margin_max) : current.profit_margin_max,
       updated_at: new Date().toISOString(),
     };
 
-    if (isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('update_record', updated, 'Targets', id, correlationId);
-      if (!res.connected || res.httpStatus !== 200) {
-        throw new Error(res.message || 'Failed to update target in Google Sheets');
-      }
+    const res = await callGoogleAppsScript('update_record', updated, 'Targets', id, correlationId);
+    if (!res.connected || res.httpStatus !== 200) {
+      throw new Error(res.message || 'Failed to update target in Google Sheets');
     }
 
-    inMemoryDb.Targets[idx] = updated;
-    saveDb();
-    return inMemoryDb.Targets[idx];
+    invalidateCache();
+    return updated;
   },
 
   async deleteTarget(id: string, correlationId?: string) {
-    const idx = inMemoryDb.Targets.findIndex((t) => t.id === id);
-    if (idx === -1) return null;
+    const all = await this.getAllAsync(true, correlationId);
+    const item = all.Targets.find((t) => t.id === id);
+    if (!item) return null;
 
-    if (isGoogleSheetsActive()) {
-      const res = await callGoogleAppsScript('delete_record', undefined, 'Targets', id, correlationId);
-      if (!res.connected || res.httpStatus !== 200) {
-        throw new Error(res.message || 'Failed to delete target from Google Sheets');
-      }
+    const res = await callGoogleAppsScript('delete_record', undefined, 'Targets', id, correlationId);
+    if (!res.connected || res.httpStatus !== 200) {
+      throw new Error(res.message || 'Failed to delete target from Google Sheets');
     }
 
-    inMemoryDb.Targets.splice(idx, 1);
-    saveDb();
+    invalidateCache();
     return { id, deleted: true };
   },
 
   // Settings
-  getSettings() {
-    return inMemoryDb.Settings;
+  async getSettings(correlationId?: string) {
+    const all = await this.getAllAsync(false, correlationId);
+    return all.Settings;
   },
 
   async setSetting(key: string, value: string, correlationId?: string) {
-    const idx = inMemoryDb.Settings.findIndex((s) => s.key === key);
+    const all = await this.getAllAsync(true, correlationId);
+    const idx = all.Settings.findIndex((s) => s.key === key);
     const now = new Date().toISOString();
     const settingObj = { key, value, updated_at: now };
 
-    if (isGoogleSheetsActive()) {
-      if (idx >= 0) {
-        await callGoogleAppsScript('update_record', settingObj, 'Settings', key, correlationId);
-      } else {
-        await callGoogleAppsScript('create_record', settingObj, 'Settings', key, correlationId);
-      }
+    if (idx >= 0) {
+      await callGoogleAppsScript('update_record', settingObj, 'Settings', key, correlationId);
+    } else {
+      await callGoogleAppsScript('create_record', settingObj, 'Settings', key, correlationId);
     }
 
-    if (idx >= 0) {
-      inMemoryDb.Settings[idx] = settingObj;
-    } else {
-      inMemoryDb.Settings.push(settingObj);
-    }
-    saveDb();
+    invalidateCache();
     return { key, value };
   },
 };

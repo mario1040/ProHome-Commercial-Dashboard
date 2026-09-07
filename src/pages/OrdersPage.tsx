@@ -47,7 +47,7 @@ export const OrdersPage: React.FC = () => {
     customer_name: '',
     customer_phone: '',
     notes: '',
-    items: [] as { product_id: string; quantity: number; unit_price: number }[],
+    items: [] as { id?: string; product_id: string; quantity: number; unit_price: number }[],
   });
 
   const fetchData = async () => {
@@ -123,6 +123,7 @@ export const OrdersPage: React.FC = () => {
       items:
         order.items && order.items.length > 0
           ? order.items.map((it) => ({
+              id: it.id,
               product_id: it.product_id,
               quantity: it.quantity,
               unit_price: it.unit_price,

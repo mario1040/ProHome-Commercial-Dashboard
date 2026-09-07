@@ -20,7 +20,48 @@ export function isCompletedSale(status: string): boolean {
 }
 
 /**
- * Calculate Product Unit Costs and Margins
+ * Direct Cost of Goods Sold (COGS) per Unit:
+ * Material Cost + Manufacturing Cost + Packaging Cost
+ */
+export function calculateProductUnitCOGS(product: {
+  material_cost?: number;
+  manufacturing_cost?: number;
+  packaging_cost?: number;
+}): number {
+  const material = Math.max(0, Number(product.material_cost) || 0);
+  const manufacturing = Math.max(0, Number(product.manufacturing_cost) || 0);
+  const packaging = Math.max(0, Number(product.packaging_cost) || 0);
+  return material + manufacturing + packaging;
+}
+
+/**
+ * Gross Profit per Unit:
+ * Selling Price - Unit COGS
+ */
+export function calculateProductUnitGrossProfit(
+  sellingPrice: number,
+  unitCOGS: number
+): number {
+  return (Number(sellingPrice) || 0) - (Number(unitCOGS) || 0);
+}
+
+/**
+ * Gross Margin (%) per Unit:
+ * (Gross Profit / Selling Price) * 100
+ */
+export function calculateProductUnitGrossMargin(
+  sellingPrice: number,
+  grossProfit: number
+): number {
+  const price = Number(sellingPrice) || 0;
+  if (price <= 0) return 0;
+  const margin = (grossProfit / price) * 100;
+  return Number.isFinite(margin) ? margin : 0;
+}
+
+/**
+ * Total Unit Cost (All-in):
+ * Unit COGS + Delivery Cost + Direct Marketing Cost
  */
 export function calculateProductCost(product: {
   material_cost?: number;
@@ -29,15 +70,18 @@ export function calculateProductCost(product: {
   delivery_cost?: number;
   marketing_cost?: number;
 }): number {
-  const material = Number(product.material_cost) || 0;
-  const manufacturing = Number(product.manufacturing_cost) || 0;
-  const packaging = Number(product.packaging_cost) || 0;
-  const delivery = Number(product.delivery_cost) || 0;
-  const marketing = Number(product.marketing_cost) || 0;
-
-  return material + manufacturing + packaging + delivery + marketing;
+  const cogs = calculateProductUnitCOGS(product);
+  const delivery = Math.max(0, Number(product.delivery_cost) || 0);
+  const marketing = Math.max(0, Number(product.marketing_cost) || 0);
+  return cogs + delivery + marketing;
 }
 
+export const calculateProductUnitTotalCost = calculateProductCost;
+
+/**
+ * Net Profit per Unit:
+ * Selling Price - Total Unit Cost
+ */
 export function calculateProductProfit(
   sellingPrice: number,
   totalCost: number
@@ -45,6 +89,12 @@ export function calculateProductProfit(
   return (Number(sellingPrice) || 0) - (Number(totalCost) || 0);
 }
 
+export const calculateProductUnitNetProfit = calculateProductProfit;
+
+/**
+ * Net Margin (%) per Unit:
+ * (Net Profit / Selling Price) * 100
+ */
 export function calculateProductMargin(
   sellingPrice: number,
   profit: number
@@ -55,13 +105,19 @@ export function calculateProductMargin(
   return Number.isFinite(margin) ? margin : 0;
 }
 
+export const calculateProductUnitNetMargin = calculateProductMargin;
+
 /**
  * Test case verification as required:
  * Selling Price = 5000, Material = 1500, Manufacturing = 1000, Packaging = 200, Delivery = 300, Marketing = 400
- * Total Cost = 3400, Profit = 1600, Margin = 32%
+ * Unit COGS = 2700, Gross Profit = 2300, Gross Margin = 46%
+ * Total Cost = 3400, Net Profit = 1600, Net Margin = 32%
  */
 export function runCostingSanityCheck(): {
   sellingPrice: number;
+  unitCOGS: number;
+  grossProfit: number;
+  grossMargin: number;
   totalCost: number;
   profit: number;
   margin: number;
@@ -75,13 +131,27 @@ export function runCostingSanityCheck(): {
     delivery_cost: 300,
     marketing_cost: 400,
   };
+  const unitCOGS = calculateProductUnitCOGS(sample);
+  const grossProfit = calculateProductUnitGrossProfit(sample.selling_price, unitCOGS);
+  const grossMargin = calculateProductUnitGrossMargin(sample.selling_price, grossProfit);
+
   const totalCost = calculateProductCost(sample);
   const profit = calculateProductProfit(sample.selling_price, totalCost);
   const margin = calculateProductMargin(sample.selling_price, profit);
 
-  const passed = totalCost === 3400 && profit === 1600 && Math.round(margin) === 32;
+  const passed =
+    unitCOGS === 2700 &&
+    grossProfit === 2300 &&
+    Math.round(grossMargin) === 46 &&
+    totalCost === 3400 &&
+    profit === 1600 &&
+    Math.round(margin) === 32;
+
   return {
     sellingPrice: sample.selling_price,
+    unitCOGS,
+    grossProfit,
+    grossMargin,
     totalCost,
     profit,
     margin,
@@ -140,7 +210,11 @@ export function calculateProductMix(
     };
     const qty = Number(item.quantity) || 0;
     const unitPrice = Number(item.unit_price) || 0;
-    const unitCost = prod ? calculateProductCost(prod) : 0;
+    // Historical unit cost or live product cost fallback
+    const unitCost =
+      item.unit_cogs !== undefined && item.unit_cogs !== null
+        ? Number(item.unit_cogs)
+        : (prod ? calculateProductUnitCOGS(prod) : 0);
 
     existing.units += qty;
     existing.revenue += qty * unitPrice;
@@ -151,7 +225,6 @@ export function calculateProductMix(
 
   const result: ProductMixItem[] = [];
 
-  // Include products that have sales, plus any active products
   productMap.forEach((prod, prodId) => {
     const stats = statsByProduct.get(prodId) || { units: 0, revenue: 0, cost: 0 };
     const profit = stats.revenue - stats.cost;
@@ -170,12 +243,19 @@ export function calculateProductMix(
     });
   });
 
-  // Sort by revenue descending by default
   return result.sort((a, b) => b.revenue - a.revenue);
 }
 
 /**
- * Calculate Monthly Dashboard Metrics
+ * Calculate Monthly Dashboard Metrics with Strict No-Double-Counting Formula:
+ * - Sales = sum of (qty * unit_price) for completed (Delivered) orders
+ * - COGS = sum of (qty * unit_cogs) for completed orders (Material + Mfg + Pkg)
+ * - Gross Profit = Sales - COGS
+ * - Gross Margin = (Gross Profit / Sales) * 100
+ * - Delivery Cost = sum of (qty * unit_delivery_cost)
+ * - Marketing Cost = monthly spend from Marketing table
+ * - Net Profit = Gross Profit - Delivery Cost - Marketing Cost = Sales - COGS - Delivery Cost - Marketing Cost
+ * - Net Margin = (Net Profit / Sales) * 100
  */
 export function calculateDashboardMetrics(
   month: string, // YYYY-MM
@@ -198,26 +278,31 @@ export function calculateDashboardMetrics(
     completedOrderIds.has(item.order_id)
   );
 
-  // 2. Sales = sum of revenue from completed orders
+  // 2. Sales, COGS, and Delivery Costs
   let sales = 0;
   let cogs = 0;
   let deliveryCost = 0;
 
   monthlyItems.forEach((item) => {
-    const qty = Number(item.quantity) || 0;
-    const unitPrice = Number(item.unit_price) || 0;
+    const qty = Math.max(0, Number(item.quantity) || 0);
+    const unitPrice = Math.max(0, Number(item.unit_price) || 0);
     sales += qty * unitPrice;
 
     const prod = productMap.get(item.product_id);
-    if (prod) {
-      // COGS is sum of product costs for completed sales
-      // Product cost = Material + Manufacturing + Packaging + Delivery + Marketing
-      const unitProductCost = calculateProductCost(prod);
-      cogs += qty * unitProductCost;
+    
+    // Line COGS: use captured historical unit_cogs if present, otherwise calculate from product
+    const itemUnitCOGS =
+      item.unit_cogs !== undefined && item.unit_cogs !== null && !isNaN(Number(item.unit_cogs))
+        ? Number(item.unit_cogs)
+        : (prod ? calculateProductUnitCOGS(prod) : 0);
+    cogs += qty * itemUnitCOGS;
 
-      // Delivery cost associated with completed sales
-      deliveryCost += qty * (Number(prod.delivery_cost) || 0);
-    }
+    // Delivery cost: use captured historical delivery cost or product delivery cost
+    const itemUnitDelivery =
+      item.unit_delivery_cost !== undefined && item.unit_delivery_cost !== null && !isNaN(Number(item.unit_delivery_cost))
+        ? Number(item.unit_delivery_cost)
+        : (prod ? Number(prod.delivery_cost) || 0 : 0);
+    deliveryCost += qty * itemUnitDelivery;
   });
 
   const ordersCount = monthlyOrders.length;
@@ -225,22 +310,23 @@ export function calculateDashboardMetrics(
 
   // 3. Marketing cost for selected month
   const marketing = marketingRecords.find((m) => m.month === month);
-  const marketingSpend = marketing ? Number(marketing.spend) || 0 : 0;
+  const marketingSpend = marketing ? Math.max(0, Number(marketing.spend) || 0) : 0;
   const marketingOrdersGenerated = marketing
-    ? Number(marketing.orders_generated) || 0
+    ? Math.max(0, Number(marketing.orders_generated) || 0)
     : 0;
-  const marketingRevenue = marketing ? Number(marketing.revenue) || 0 : 0;
+  const marketingRevenue = marketing ? Math.max(0, Number(marketing.revenue) || 0) : 0;
 
   const costPerOrder =
     marketingOrdersGenerated > 0
       ? marketingSpend / marketingOrdersGenerated
-      : 0;
+      : (ordersCount > 0 ? marketingSpend / ordersCount : 0);
 
-  const roas = marketingSpend > 0 ? marketingRevenue / marketingSpend : 0;
+  const roas = marketingSpend > 0 ? (marketingRevenue || sales) / marketingSpend : 0;
 
-  // 4. Net Profit & Margin
-  // Formula: Net Profit = Sales - COGS - Marketing Cost - Delivery Cost
-  const netProfit = sales - cogs - marketingSpend - deliveryCost;
+  // 4. Net Profit & Margins
+  // Formula: Net Profit = Gross Profit - Delivery Cost - Marketing Cost = Sales - COGS - Delivery Cost - Marketing Cost
+  const grossProfit = sales - cogs;
+  const netProfit = grossProfit - deliveryCost - marketingSpend;
   const netMargin = sales > 0 ? (netProfit / sales) * 100 : 0;
 
   // 5. Target comparison
@@ -272,7 +358,7 @@ export function calculateDashboardMetrics(
     delivery_cost: deliveryCost,
     net_profit: netProfit,
     net_margin: Number.isFinite(netMargin) ? netMargin : 0,
-    website_conversion_rate: 'Not available', // Explicitly required: "Not available" when website traffic data is absent
+    website_conversion_rate: 'Not available', // Explicit requirement
     cost_per_order: Number.isFinite(costPerOrder) ? costPerOrder : 0,
     roas: Number.isFinite(roas) ? roas : 0,
     target,
@@ -292,7 +378,6 @@ export function calculateMonthlyPerformance(
   targets: Target[],
   year?: string
 ): MonthlyPerformanceRecord[] {
-  // Collect all unique months from orders, marketing, and targets
   const monthSet = new Set<string>();
 
   orders.forEach((o) => {
@@ -302,11 +387,11 @@ export function calculateMonthlyPerformance(
   });
 
   marketingRecords.forEach((m) => {
-    if (m.month) monthSet.add(m.month);
+    if (m.month && m.month.length >= 7) monthSet.add(m.month.substring(0, 7));
   });
 
   targets.forEach((t) => {
-    if (t.month) monthSet.add(t.month);
+    if (t.month && t.month.length >= 7) monthSet.add(t.month.substring(0, 7));
   });
 
   const sortedMonths = Array.from(monthSet).sort();
@@ -345,3 +430,4 @@ export function calculateMonthlyPerformance(
       };
     });
 }
+

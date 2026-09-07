@@ -28,6 +28,8 @@ export interface AuthPayload {
   exp: number;
 }
 
+export type JWTPayload = AuthPayload;
+
 export function generateToken(user: { id: string; username: string; role: string }): string {
   const payload: AuthPayload = {
     userId: user.id,

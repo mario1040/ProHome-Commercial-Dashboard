@@ -85,6 +85,24 @@ export function logCrudOperation(params: {
   });
 }
 
+export function logAuditTrail(params: {
+  correlationId?: string;
+  endpoint: string;
+  user: string;
+  ip: string;
+  statusCode: number;
+  durationMs: number;
+}) {
+  logStructured({
+    type: 'REQUEST',
+    correlationId: params.correlationId,
+    path: params.endpoint,
+    statusCode: params.statusCode,
+    durationMs: params.durationMs,
+    message: `[AUDIT] ${params.endpoint} - User: ${params.user} - IP: ${params.ip} - Status: ${params.statusCode} (${params.durationMs}ms)`,
+  });
+}
+
 export function logStructured(entry: LogEntry) {
   const timestamp = new Date().toISOString();
   const logObj = {

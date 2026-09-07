@@ -91,9 +91,9 @@ export const SettingsPage: React.FC = () => {
     setIsSyncing(true);
     setAuthErrorNotice(null);
     try {
-      const res = await api.sync.pushToSheets();
+      const res = await api.sync.pullFromSheets();
       if (res.success) {
-        success(res.message || 'Database successfully synchronized with Google Sheets & Drive');
+        success(res.message || 'Database refreshed directly from Google Sheets');
         setAuthErrorNotice(null);
         fetchSettingsAndTargets();
       } else {
@@ -177,19 +177,14 @@ export const SettingsPage: React.FC = () => {
                   Google Workspace (Sheets & Drive) Database Architecture
                 </h2>
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${
-                    syncStatus?.persistenceMode === 'GOOGLE_SHEETS'
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                 >
-                  {syncStatus?.persistenceMode === 'GOOGLE_SHEETS' ? 'GOOGLE SHEETS MODE (ACTIVE)' : 'LOCAL PERSISTENCE MODE'}
+                  GOOGLE SHEETS MODE (ONLINE-ONLY SOURCE OF TRUTH)
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                The ProHome Commercial Dashboard persists all business operations into 7 structured tables:
-                Products, Orders, Order_Items, Marketing, Targets, Settings, and Users. Data is stored locally and
-                mirrored to your private Google Spreadsheet and Google Drive via the Google Apps Script Web App API.
+                The ProHome Commercial Dashboard reads and persists all business operations directly to your Google Spreadsheet in real time across 7 structured tables:
+                Products, Orders, Order_Items, Marketing, Targets, Settings, and Users. Google Sheets is the sole source of truth.
               </p>
             </div>
           </div>
@@ -212,7 +207,7 @@ export const SettingsPage: React.FC = () => {
               className="px-5 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] disabled:opacity-40 cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Syncing Tables...' : 'Sync Database to Google Sheets'}
+              {isSyncing ? 'Refreshing...' : 'Pull Latest from Google Sheets'}
             </button>
           </div>
         </div>
@@ -250,10 +245,10 @@ export const SettingsPage: React.FC = () => {
               <span>Storage Architecture</span>
             </div>
             <div className="text-xs font-semibold text-white">
-              {syncStatus?.persistenceMode === 'GOOGLE_SHEETS' ? 'Google Sheets (Primary)' : 'Local Fast Cache (Standby)'}
+              Google Sheets (Sole Source of Truth)
             </div>
             <div className="text-[11px] text-slate-500 mt-0.5">
-              {syncStatus?.isConfigured ? 'Apps Script Web App configured' : 'Local file store ready'}
+              Online-only real-time synchronization
             </div>
           </div>
 
