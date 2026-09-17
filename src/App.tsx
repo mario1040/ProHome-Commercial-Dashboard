@@ -41,10 +41,10 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center text-slate-300">
+      <div className="min-h-screen bg-[#0C0B0A] flex items-center justify-center text-[#EDE1D3]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-slate-800 border-t-indigo-500 rounded-full animate-spin shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
-          <div className="text-xs font-medium tracking-wide text-slate-400">Initializing ProHome Commercial Dashboard...</div>
+          <div className="w-10 h-10 border-2 border-[#26231F] border-t-[#EDE1D3] rounded-full animate-spin shadow-[0_0_15px_rgba(237,225,211,0.25)]" />
+          <div className="text-xs font-medium tracking-wide text-[#A8A096]">Initializing ProHome Commercial Dashboard...</div>
         </div>
       </div>
     );
@@ -97,7 +97,7 @@ const AppContent: React.FC = () => {
   const headerInfo = getPageHeaderInfo();
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-slate-100 flex font-sans">
+    <div className="min-h-screen bg-[#0C0B0A] text-[#FBF9F5] flex font-sans selection:bg-[#EDE1D3]/20 selection:text-[#EDE1D3]">
       {/* Navigation Sidebar */}
       <Sidebar
         currentTab={currentTab}

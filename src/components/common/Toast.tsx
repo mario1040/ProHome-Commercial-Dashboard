@@ -46,19 +46,19 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             id={`toast-${toast.id}`}
             className={`pointer-events-auto flex items-start gap-3.5 p-4 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-200 ${
               toast.type === 'success'
-                ? 'bg-slate-900/90 text-slate-100 border-emerald-500/30 shadow-[0_10px_30px_rgba(16,185,129,0.1)]'
+                ? 'bg-[#161412]/95 text-[#FBF9F5] border-[#52C48D]/35 shadow-[0_10px_30px_rgba(82,196,141,0.1)]'
                 : toast.type === 'error'
-                ? 'bg-slate-900/90 text-slate-100 border-rose-500/30 shadow-[0_10px_30px_rgba(244,63,94,0.1)]'
-                : 'bg-slate-900/90 text-slate-100 border-slate-800'
+                ? 'bg-[#161412]/95 text-[#FBF9F5] border-[#E06A6A]/35 shadow-[0_10px_30px_rgba(224,106,106,0.1)]'
+                : 'bg-[#161412]/95 text-[#FBF9F5] border-[#EDE1D3]/35 shadow-[0_10px_30px_rgba(237,225,211,0.08)]'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />}
-            {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />}
-            {toast.type === 'info' && <Info className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />}
+            {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-[#52C48D] shrink-0 mt-0.5" />}
+            {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-[#E06A6A] shrink-0 mt-0.5" />}
+            {toast.type === 'info' && <Info className="w-5 h-5 text-[#EDE1D3] shrink-0 mt-0.5" />}
             <div className="flex-1 text-xs font-semibold leading-relaxed">{toast.message}</div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              className="text-[#8C8275] hover:text-[#EDE1D3] p-1 rounded-lg hover:bg-[#201D1A] transition-colors cursor-pointer"
               aria-label="Close notification"
             >
               <X className="w-4 h-4" />

@@ -17,6 +17,7 @@ import { api } from '../services/api';
 import { DashboardMetrics, ProductMixItem, MonthlyPerformanceRecord } from '../types';
 import { formatEgp, formatPercent, formatNumber, formatRatio } from '../utils/format';
 import { KpiCard } from '../components/common/KpiCard';
+import { proHomeTheme } from '../utils/theme';
 import {
   ResponsiveContainer,
   LineChart,
@@ -73,10 +74,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] text-slate-400">
+      <div className="flex items-center justify-center min-h-[400px] text-[#A8A096]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-slate-800 border-t-indigo-500 rounded-full animate-spin shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
-          <span className="text-xs font-medium text-slate-400">Computing commercial metrics...</span>
+          <div className="w-8 h-8 border-2 border-[#26231F] border-t-[#EDE1D3] rounded-full animate-spin shadow-[0_0_12px_rgba(237,225,211,0.25)]" />
+          <span className="text-xs font-medium text-[#A8A096]">Computing commercial metrics...</span>
         </div>
       </div>
     );
@@ -84,7 +85,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
 
   if (error || !metrics) {
     return (
-      <div className="p-6 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-300 text-xs">
+      <div className="p-6 bg-[#E06A6A]/10 border border-[#E06A6A]/30 rounded-2xl text-[#E06A6A] text-xs">
         {error || 'Unable to load dashboard metrics'}
       </div>
     );
@@ -106,15 +107,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
   return (
     <div className="space-y-8">
       {/* Target vs Actual Executive Widget */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 lg:p-8 relative overflow-hidden backdrop-blur-md shadow-lg">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800/80 relative z-10">
+      <div className="bg-[#161412]/85 border border-[#26231F] rounded-3xl p-6 lg:p-8 relative overflow-hidden backdrop-blur-md shadow-lg">
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-[#EDE1D3]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-[#26231F] relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <TargetIcon className="w-4 h-4 text-indigo-400" />
-              <h2 className="text-base font-semibold text-white tracking-tight">Commercial Target vs Actual ({metrics.month})</h2>
+              <TargetIcon className="w-4 h-4 text-[#EDE1D3]" />
+              <h2 className="text-base font-semibold text-[#FBF9F5] tracking-tight">Commercial Target vs Actual ({metrics.month})</h2>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[#A8A096]">
               Comparison of confirmed completed sales against monthly financial targets
             </p>
           </div>
@@ -123,24 +124,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
             {metrics.target ? (
               <>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Sales Target</div>
-                  <div className="text-base font-bold text-white tracking-tight">{formatEgp(metrics.target.sales_target)}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#8C8275] font-bold mb-0.5">Sales Target</div>
+                  <div className="text-base font-bold text-[#FBF9F5] font-mono tracking-tight">{formatEgp(metrics.target.sales_target)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Target Margin</div>
-                  <div className="text-base font-bold text-slate-200">
+                  <div className="text-[10px] uppercase tracking-wider text-[#8C8275] font-bold mb-0.5">Target Margin</div>
+                  <div className="text-base font-bold text-[#EDE1D3] font-mono">
                     {metrics.target.profit_margin_min}% – {metrics.target.profit_margin_max}%
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Achievement</div>
+                  <div className="text-[10px] uppercase tracking-wider text-[#8C8275] font-bold mb-0.5">Achievement</div>
                   <div
                     className={`text-base font-bold font-mono ${
                       (metrics.sales_achievement_rate || 0) >= 100
-                        ? 'text-emerald-400'
+                        ? 'text-[#52C48D]'
                         : (metrics.sales_achievement_rate || 0) >= 80
-                        ? 'text-amber-400'
-                        : 'text-slate-300'
+                        ? 'text-[#E6AF55]'
+                        : 'text-[#A8A096]'
                     }`}
                   >
                     {metrics.sales_achievement_rate !== null
@@ -150,7 +151,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
                 </div>
               </>
             ) : (
-              <div className="text-xs text-amber-400 font-medium">No target configured for {metrics.month}</div>
+              <div className="text-xs text-[#E6AF55] font-medium">No target configured for {metrics.month}</div>
             )}
           </div>
         </div>
@@ -159,21 +160,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
         {metrics.target && metrics.target.sales_target > 0 && (
           <div className="mt-5 pt-1 relative z-10">
             <div className="flex justify-between text-xs mb-2">
-              <span className="text-slate-400">
-                Actual Sales: <strong className="text-white font-mono">{formatEgp(metrics.sales)}</strong>
+              <span className="text-[#A8A096]">
+                Actual Sales: <strong className="text-[#EDE1D3] font-mono">{formatEgp(metrics.sales)}</strong>
               </span>
-              <span className="text-slate-400">
-                Target: <strong className="text-white font-mono">{formatEgp(metrics.target.sales_target)}</strong>
+              <span className="text-[#A8A096]">
+                Target: <strong className="text-[#FBF9F5] font-mono">{formatEgp(metrics.target.sales_target)}</strong>
               </span>
             </div>
-            <div className="w-full h-2.5 bg-slate-950 border border-slate-800/80 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-[#100F0E] border border-[#26231F] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(99,102,241,0.5)] ${
+                className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(237,225,211,0.3)] ${
                   (metrics.sales_achievement_rate || 0) >= 100
-                    ? 'bg-gradient-to-r from-indigo-500 to-emerald-400'
+                    ? 'bg-gradient-to-r from-[#C5A059] to-[#52C48D]'
                     : (metrics.sales_achievement_rate || 0) >= 75
-                    ? 'bg-gradient-to-r from-indigo-500 to-amber-400'
-                    : 'bg-indigo-500'
+                    ? 'bg-gradient-to-r from-[#C5A059] to-[#EDE1D3]'
+                    : 'bg-[#EDE1D3]'
                 }`}
                 style={{ width: `${Math.min(100, metrics.sales_achievement_rate || 0)}%` }}
               />
@@ -273,55 +274,55 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
       {/* Visual Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sales & Orders Trend */}
-        <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 backdrop-blur-md">
+        <div className="bg-[#161412]/85 border border-[#26231F] rounded-3xl p-6 backdrop-blur-md">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-bold mb-1">Performance Curve</div>
-              <h3 className="text-sm font-semibold text-white">Commercial Sales Trend</h3>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-[#8C8275] font-bold mb-1">Performance Curve</div>
+              <h3 className="text-sm font-semibold text-[#FBF9F5]">Commercial Sales Trend</h3>
             </div>
-            <span className="text-[11px] text-slate-500">Sales vs Target (EGP)</span>
+            <span className="text-[11px] text-[#8C8275]">Sales vs Target (EGP)</span>
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} tickFormatter={(val) => `${val / 1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26231F" />
+                <XAxis dataKey="month" stroke="#8C8275" fontSize={11} />
+                <YAxis stroke="#8C8275" fontSize={11} tickFormatter={(val) => `${val / 1000}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#334155', borderRadius: '12px', fontSize: '12px', color: '#f1f5f9', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}
+                  contentStyle={{ backgroundColor: '#141210', borderColor: '#332F2A', borderRadius: '12px', fontSize: '12px', color: '#FBF9F5', boxShadow: '0 10px 25px rgba(0,0,0,0.6)' }}
                   formatter={(val: any) => [`${formatEgp(Number(val))}`, '']}
                 />
-                <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                <Line type="monotone" dataKey="sales" name="Actual Sales" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }} />
-                <Line type="monotone" dataKey="target" name="Sales Target" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <Legend wrapperStyle={{ fontSize: '11px', color: '#B5ACA2' }} />
+                <Line type="monotone" dataKey="sales" name="Actual Sales" stroke="#EDE1D3" strokeWidth={3} dot={{ r: 4, fill: '#EDE1D3' }} activeDot={{ r: 6, stroke: '#FBF9F5', strokeWidth: 2 }} />
+                <Line type="monotone" dataKey="target" name="Sales Target" stroke="#8C8275" strokeWidth={2} strokeDasharray="5 5" dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Monthly Profitability Breakdown */}
-        <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 backdrop-blur-md">
+        <div className="bg-[#161412]/85 border border-[#26231F] rounded-3xl p-6 backdrop-blur-md">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-bold mb-1">Financial Composition</div>
-              <h3 className="text-sm font-semibold text-white">Monthly Profitability Breakdown</h3>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-[#8C8275] font-bold mb-1">Financial Composition</div>
+              <h3 className="text-sm font-semibold text-[#FBF9F5]">Monthly Profitability Breakdown</h3>
             </div>
-            <span className="text-[11px] text-slate-500">EGP</span>
+            <span className="text-[11px] text-[#8C8275]">EGP</span>
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={trendData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="month" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} tickFormatter={(val) => `${val / 1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#26231F" />
+                <XAxis dataKey="month" stroke="#8C8275" fontSize={11} />
+                <YAxis stroke="#8C8275" fontSize={11} tickFormatter={(val) => `${val / 1000}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#09090b', borderColor: '#334155', borderRadius: '12px', fontSize: '12px', color: '#f1f5f9', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}
+                  contentStyle={{ backgroundColor: '#141210', borderColor: '#332F2A', borderRadius: '12px', fontSize: '12px', color: '#FBF9F5', boxShadow: '0 10px 25px rgba(0,0,0,0.6)' }}
                   formatter={(val: any) => [`${formatEgp(Number(val))}`, '']}
                 />
-                <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
-                <Bar dataKey="sales" name="Sales" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="cogs" name="COGS" fill="#334155" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="profit" name="Net Profit" fill="#10b981" radius={[6, 6, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: '11px', color: '#B5ACA2' }} />
+                <Bar dataKey="sales" name="Sales" fill="#EDE1D3" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="cogs" name="COGS" fill="#3D3731" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="profit" name="Net Profit" fill="#52C48D" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -329,24 +330,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
       </div>
 
       {/* Product Mix Ranking */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-6 lg:p-8 backdrop-blur-md">
+      <div className="bg-[#161412]/85 border border-[#26231F] rounded-3xl p-6 lg:p-8 backdrop-blur-md">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-bold mb-1">Catalog Performance</div>
-            <h3 className="text-base font-semibold text-white">Product Mix & Commercial Performance</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <div className="text-[10px] uppercase tracking-[0.15em] text-[#8C8275] font-bold mb-1">Catalog Performance</div>
+            <h3 className="text-base font-semibold text-[#FBF9F5]">Product Mix & Commercial Performance</h3>
+            <p className="text-xs text-[#A8A096] mt-0.5">
               Derived from completed orders, historical unit prices, and unit product costing
             </p>
           </div>
-          <div className="text-xs text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800">
-            Active SKUs: <strong className="text-white">{productMix.length}</strong>
+          <div className="text-xs text-[#A8A096] bg-[#100F0E] px-3 py-1.5 rounded-xl border border-[#26231F]">
+            Active SKUs: <strong className="text-[#EDE1D3]">{productMix.length}</strong>
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+              <tr className="border-b border-[#26231F] text-[10px] uppercase tracking-widest text-[#8C8275] font-bold">
                 <th className="py-3 px-4">Product Name</th>
                 <th className="py-3 px-4">SKU</th>
                 <th className="py-3 px-4 text-right">Units Sold</th>
@@ -356,23 +357,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ selectedMonth }) =
                 <th className="py-3 px-4 text-right">Margin</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-[#26231F]/60">
               {productMix.map((p) => (
-                <tr key={p.product_id} className="hover:bg-slate-800/20 transition-all text-slate-300">
-                  <td className="py-3.5 px-4 font-semibold text-white">{p.product_name}</td>
-                  <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">{p.sku}</td>
-                  <td className="py-3.5 px-4 text-right text-slate-200 font-mono font-semibold">{formatNumber(p.units_sold)}</td>
-                  <td className="py-3.5 px-4 text-right text-white font-mono font-medium">{formatEgp(p.revenue)}</td>
-                  <td className="py-3.5 px-4 text-right text-slate-400 font-mono">{formatEgp(p.product_cost)}</td>
-                  <td className="py-3.5 px-4 text-right text-emerald-400 font-mono font-semibold">{formatEgp(p.profit)}</td>
+                <tr key={p.product_id} className="hover:bg-[#201D1A]/40 transition-all text-[#B5ACA2]">
+                  <td className="py-3.5 px-4 font-semibold text-[#FBF9F5]">{p.product_name}</td>
+                  <td className="py-3.5 px-4 font-mono text-[#8C8275] text-[11px]">{p.sku}</td>
+                  <td className="py-3.5 px-4 text-right text-[#FBF9F5] font-mono font-semibold">{formatNumber(p.units_sold)}</td>
+                  <td className="py-3.5 px-4 text-right text-[#EDE1D3] font-mono font-medium">{formatEgp(p.revenue)}</td>
+                  <td className="py-3.5 px-4 text-right text-[#8C8275] font-mono">{formatEgp(p.product_cost)}</td>
+                  <td className="py-3.5 px-4 text-right text-[#52C48D] font-mono font-semibold">{formatEgp(p.profit)}</td>
                   <td className="py-3.5 px-4 text-right font-medium">
                     <span
                       className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
                         p.margin >= 30
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          ? 'bg-[#52C48D]/10 text-[#52C48D] border border-[#52C48D]/25'
                           : p.margin >= 25
-                          ? 'bg-slate-800 text-slate-300 border border-slate-700'
-                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          ? 'bg-[#181614] text-[#EDE1D3] border border-[#332F2A]'
+                          : 'bg-[#E6AF55]/10 text-[#E6AF55] border border-[#E6AF55]/25'
                       }`}
                     >
                       {formatPercent(p.margin)}

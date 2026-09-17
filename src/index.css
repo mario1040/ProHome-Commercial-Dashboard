@@ -1,27 +1,78 @@
 @import "tailwindcss";
 
+@theme {
+  --color-prohome-brand: #EDE1D3;
+  --color-prohome-brand-hover: #F7EFE6;
+  --color-prohome-brand-dark: #C8B9A6;
+  
+  --color-prohome-bg: #0C0B0A;
+  --color-prohome-surface: #161412;
+  --color-prohome-elevated: #201D1A;
+  --color-prohome-input: #100F0E;
+  
+  --color-prohome-border-subtle: #26231F;
+  --color-prohome-border: #332F2A;
+  --color-prohome-border-light: #423D37;
+
+  --color-prohome-text: #FBF9F5;
+  --color-prohome-text-secondary: #B5ACA2;
+  --color-prohome-text-muted: #787066;
+
+  --color-prohome-success: #52C48D;
+  --color-prohome-warning: #E6AF55;
+  --color-prohome-danger: #E06A6A;
+  --color-prohome-info: #C4B9AD;
+}
+
+:root {
+  --brand-primary: #EDE1D3;
+  --brand-primary-hover: #F7EFE6;
+  --brand-primary-active: #DDD1C1;
+  --brand-muted: rgba(237, 225, 211, 0.12);
+  --brand-border: rgba(237, 225, 211, 0.25);
+  --brand-glow: rgba(237, 225, 211, 0.18);
+
+  --bg-primary: #0C0B0A;
+  --bg-surface: #161412;
+  --bg-elevated: #201D1A;
+  --bg-input: #100F0E;
+
+  --border-subtle: #26231F;
+  --border-default: #332F2A;
+  --border-elevated: #423D37;
+
+  --text-primary: #FBF9F5;
+  --text-secondary: #B5ACA2;
+  --text-muted: #787066;
+  --text-brand: #EDE1D3;
+
+  --success: #52C48D;
+  --warning: #E6AF55;
+  --danger: #E06A6A;
+}
+
 @layer base {
   body {
-    background-color: #09090b;
-    color: #f1f5f9;
+    background-color: #0C0B0A;
+    color: #FBF9F5;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Sleek custom scrollbars */
+  /* Sleek custom warm scrollbars */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #09090b;
+    background: #0C0B0A;
   }
   ::-webkit-scrollbar-thumb {
-    background: #1e293b;
+    background: #2D2924;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #334155;
+    background: #423D37;
   }
 }

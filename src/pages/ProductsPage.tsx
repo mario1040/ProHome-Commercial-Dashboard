@@ -205,18 +205,18 @@ export const ProductsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Filter Bar */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center backdrop-blur-md">
+      <div className="bg-[#161412]/85 border border-[#26231F] rounded-3xl p-5 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center backdrop-blur-md">
         <div className="flex flex-1 flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-[#787066] absolute left-3.5 top-3" />
             <input
               id="products-search-input"
               type="text"
               placeholder="Search by product name or SKU..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-hidden focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/60 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] placeholder-[#5C554D] focus:outline-hidden focus:border-[#EDE1D3]/70 focus:ring-1 focus:ring-[#EDE1D3]/70 transition-all font-mono"
             />
           </div>
 
@@ -225,7 +225,7 @@ export const ProductsPage: React.FC = () => {
             id="products-category-filter"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-indigo-500/60 cursor-pointer"
+            className="px-3.5 py-2.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70 cursor-pointer"
           >
             <option value="ALL">All Categories</option>
             {categories.map((cat) => (
@@ -239,7 +239,7 @@ export const ProductsPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-indigo-500/60 cursor-pointer"
+            className="px-3.5 py-2.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70 cursor-pointer"
           >
             <option value="ALL">All Statuses</option>
             <option value="ACTIVE">Active Only</option>
@@ -250,7 +250,7 @@ export const ProductsPage: React.FC = () => {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-indigo-500/60 cursor-pointer"
+            className="px-3.5 py-2.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70 cursor-pointer"
           >
             <option value="name">Sort by Name</option>
             <option value="price">Sort by Price (High to Low)</option>
@@ -262,7 +262,7 @@ export const ProductsPage: React.FC = () => {
         <button
           id="add-product-btn"
           onClick={handleOpenAdd}
-          className="px-5 py-2.5 bg-slate-50 hover:bg-white text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] shrink-0 cursor-pointer"
+          className="px-5 py-2.5 bg-[#EDE1D3] hover:bg-[#F7EFE6] text-[#121110] font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-[0_4px_20px_rgba(237,225,211,0.18)] shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Add Product
@@ -270,26 +270,26 @@ export const ProductsPage: React.FC = () => {
       </div>
 
       {/* Products Table */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-3xl overflow-hidden backdrop-blur-md">
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center text-xs text-slate-400">
+      <div className="bg-[#161412]/85 border border-[#26231F] rounded-3xl overflow-hidden backdrop-blur-md">
+        <div className="px-6 py-4 border-b border-[#26231F] flex justify-between items-center text-xs text-[#A8A096]">
           <div>
-            Showing <strong className="text-white font-mono">{filteredProducts.length}</strong> of{' '}
-            <strong className="text-white font-mono">{products.length}</strong> products
+            Showing <strong className="text-[#FBF9F5] font-mono">{filteredProducts.length}</strong> of{' '}
+            <strong className="text-[#FBF9F5] font-mono">{products.length}</strong> products
           </div>
-          <div className="text-[11px] text-slate-500 font-medium">
+          <div className="text-[11px] text-[#787066] font-medium">
             * Historical orders preserve unit prices independently from catalog edits
           </div>
         </div>
 
         {filteredProducts.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-xs">
+          <div className="p-12 text-center text-[#787066] text-xs">
             No products match your criteria.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-800 text-[10px] uppercase tracking-widest text-slate-500 font-bold bg-slate-950/40">
+                <tr className="border-b border-[#26231F] text-[10px] uppercase tracking-widest text-[#8C8275] font-bold bg-[#100F0E]/60">
                   <th className="py-3.5 px-4 font-bold">Product Name</th>
                   <th className="py-3.5 px-4 font-bold">SKU</th>
                   <th className="py-3.5 px-4 font-bold">Category</th>
@@ -301,32 +301,32 @@ export const ProductsPage: React.FC = () => {
                   <th className="py-3.5 px-4 font-bold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-[#26231F]/50">
                 {filteredProducts.map((p) => {
                   const totalCost = calculateProductCost(p);
                   const profit = calculateProductProfit(p.selling_price, totalCost);
                   const margin = calculateProductMargin(p.selling_price, profit);
 
                   return (
-                    <tr key={p.id} className="hover:bg-slate-800/20 transition-colors">
-                      <td className="py-3.5 px-4 font-semibold text-white">{p.name}</td>
-                      <td className="py-3.5 px-4 font-mono text-slate-400 text-[11px]">{p.sku}</td>
-                      <td className="py-3.5 px-4 text-slate-400">{p.category}</td>
-                      <td className="py-3.5 px-4 text-right font-mono font-semibold text-white">
+                    <tr key={p.id} className="hover:bg-[#201D1A]/30 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-[#FBF9F5]">{p.name}</td>
+                      <td className="py-3.5 px-4 font-mono text-[#A8A096] text-[11px]">{p.sku}</td>
+                      <td className="py-3.5 px-4 text-[#A8A096]">{p.category}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-semibold text-[#FBF9F5]">
                         {formatEgp(p.selling_price)}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-mono text-slate-400">{formatEgp(totalCost)}</td>
-                      <td className="py-3.5 px-4 text-right font-mono font-semibold text-emerald-400">
+                      <td className="py-3.5 px-4 text-right font-mono text-[#A8A096]">{formatEgp(totalCost)}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-semibold text-[#52C48D]">
                         {formatEgp(profit)}
                       </td>
                       <td className="py-3.5 px-4 text-right font-medium">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                             margin >= 30
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              ? 'bg-[#52C48D]/10 text-[#52C48D] border border-[#52C48D]/25'
                               : margin >= 25
-                              ? 'bg-slate-800 text-slate-300 border border-slate-700'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              ? 'bg-[#181614] text-[#EDE1D3] border border-[#332F2A]'
+                              : 'bg-[#E6AF55]/10 text-[#E6AF55] border border-[#E6AF55]/25'
                           }`}
                         >
                           {formatPercent(margin)}
@@ -334,12 +334,12 @@ export const ProductsPage: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         {p.is_active ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.8)]" /> Active
+                          <span className="inline-flex items-center gap-1.5 text-[11px] text-[#52C48D] font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#52C48D] animate-pulse shadow-[0_0_6px_rgba(82,196,141,0.8)]" /> Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" /> Inactive
+                          <span className="inline-flex items-center gap-1.5 text-[11px] text-[#787066] font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#787066]" /> Inactive
                           </span>
                         )}
                       </td>
@@ -347,7 +347,7 @@ export const ProductsPage: React.FC = () => {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => handleOpenEdit(p)}
-                            className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 rounded-xl transition-colors"
+                            className="p-2 text-[#8C8275] hover:text-[#EDE1D3] hover:bg-[#201D1A] rounded-xl transition-colors cursor-pointer"
                             title="Edit product"
                             aria-label="Edit product"
                           >
@@ -355,7 +355,7 @@ export const ProductsPage: React.FC = () => {
                           </button>
                           <button
                             onClick={() => setDeleteTarget(p)}
-                            className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800/60 rounded-xl transition-colors"
+                            className="p-2 text-[#8C8275] hover:text-[#E06A6A] hover:bg-[#201D1A] rounded-xl transition-colors cursor-pointer"
                             title="Delete or deactivate product"
                             aria-label="Delete or deactivate product"
                           >
@@ -386,114 +386,114 @@ export const ProductsPage: React.FC = () => {
         <form onSubmit={handleSaveProduct} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">Product Name *</label>
+              <label className="block text-[11px] font-medium text-[#A8A096] mb-1">Product Name *</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. Smart Desk Pro"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-indigo-500/60"
+                className="w-full px-3 py-2 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">SKU *</label>
+              <label className="block text-[11px] font-medium text-[#A8A096] mb-1">SKU *</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. PH-DSK-001"
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white focus:outline-hidden focus:border-indigo-500/60"
+                className="w-full px-3 py-2 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs font-mono text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">Category</label>
+              <label className="block text-[11px] font-medium text-[#A8A096] mb-1">Category</label>
               <input
                 type="text"
                 placeholder="e.g. Smart Desks, Transforming Tables"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-indigo-500/60"
+                className="w-full px-3 py-2 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">Selling Price (EGP) *</label>
+              <label className="block text-[11px] font-medium text-[#A8A096] mb-1">Selling Price (EGP) *</label>
               <input
                 type="number"
                 required
                 min="0"
                 value={formData.selling_price}
                 onChange={(e) => setFormData({ ...formData, selling_price: Math.max(0, Number(e.target.value)) })}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-white focus:outline-hidden focus:border-indigo-500/60"
+                className="w-full px-3 py-2 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs font-semibold text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
               />
             </div>
           </div>
 
           {/* Cost Components Breakdown */}
-          <div className="pt-3 border-t border-slate-800">
-            <span className="text-xs font-semibold text-slate-200 block mb-2">Cost Breakdown Components (EGP)</span>
+          <div className="pt-3 border-t border-[#26231F]">
+            <span className="text-xs font-semibold text-[#FBF9F5] block mb-2">Cost Breakdown Components (EGP)</span>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Material Cost</label>
+                <label className="block text-[10px] text-[#A8A096] mb-1">Material Cost</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.material_cost}
                   onChange={(e) => setFormData({ ...formData, material_cost: Math.max(0, Number(e.target.value)) })}
-                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden"
+                  className="w-full px-2.5 py-1.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Manufacturing Cost</label>
+                <label className="block text-[10px] text-[#A8A096] mb-1">Manufacturing Cost</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.manufacturing_cost}
                   onChange={(e) => setFormData({ ...formData, manufacturing_cost: Math.max(0, Number(e.target.value)) })}
-                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden"
+                  className="w-full px-2.5 py-1.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Packaging Cost</label>
+                <label className="block text-[10px] text-[#A8A096] mb-1">Packaging Cost</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.packaging_cost}
                   onChange={(e) => setFormData({ ...formData, packaging_cost: Math.max(0, Number(e.target.value)) })}
-                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden"
+                  className="w-full px-2.5 py-1.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Delivery Cost</label>
+                <label className="block text-[10px] text-[#A8A096] mb-1">Delivery Cost</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.delivery_cost}
                   onChange={(e) => setFormData({ ...formData, delivery_cost: Math.max(0, Number(e.target.value)) })}
-                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden"
+                  className="w-full px-2.5 py-1.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-400 mb-1">Marketing Cost</label>
+                <label className="block text-[10px] text-[#A8A096] mb-1">Marketing Cost</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.marketing_cost}
                   onChange={(e) => setFormData({ ...formData, marketing_cost: Math.max(0, Number(e.target.value)) })}
-                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden"
+                  className="w-full px-2.5 py-1.5 bg-[#100F0E] border border-[#2E2A25] rounded-xl text-xs text-[#FBF9F5] focus:outline-hidden focus:border-[#EDE1D3]/70"
                 />
               </div>
               <div className="flex items-center pt-4">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-[#A8A096]">
                   <input
                     type="checkbox"
                     checked={formData.is_active}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-500 bg-slate-900 border-slate-700"
+                    className="w-4 h-4 rounded text-[#EDE1D3] bg-[#100F0E] border-[#2E2A25] accent-[#EDE1D3]"
                   />
                   <span>Active Catalog Item</span>
                 </label>
@@ -502,35 +502,35 @@ export const ProductsPage: React.FC = () => {
           </div>
 
           {/* Live Calculated Cost Summary */}
-          <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 grid grid-cols-3 gap-3 text-center text-xs">
+          <div className="p-4 bg-[#100F0E] rounded-2xl border border-[#26231F] grid grid-cols-3 gap-3 text-center text-xs">
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Total Cost</span>
-              <span className="font-mono font-semibold text-white">{formatEgp(formTotalCost)}</span>
+              <span className="text-[#8C8275] block text-[10px] uppercase font-bold tracking-wider mb-0.5">Total Cost</span>
+              <span className="font-mono font-semibold text-[#FBF9F5]">{formatEgp(formTotalCost)}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Unit Profit</span>
-              <span className="font-mono font-semibold text-emerald-400">{formatEgp(formProfit)}</span>
+              <span className="text-[#8C8275] block text-[10px] uppercase font-bold tracking-wider mb-0.5">Unit Profit</span>
+              <span className="font-mono font-semibold text-[#52C48D]">{formatEgp(formProfit)}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider mb-0.5">Profit Margin</span>
-              <span className="font-mono font-semibold text-indigo-400">{formatPercent(formMargin)}</span>
+              <span className="text-[#8C8275] block text-[10px] uppercase font-bold tracking-wider mb-0.5">Profit Margin</span>
+              <span className="font-mono font-semibold text-[#EDE1D3]">{formatPercent(formMargin)}</span>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+          <div className="flex justify-end gap-3 pt-3 border-t border-[#26231F]">
             <button
               type="button"
               onClick={() => {
                 setIsAddModalOpen(false);
                 setIsEditModalOpen(false);
               }}
-              className="px-5 py-2 text-xs font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl transition-colors"
+              className="px-5 py-2 text-xs font-semibold text-[#A8A096] bg-[#181614] hover:bg-[#201D1A] border border-[#2E2A25] rounded-xl transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-slate-950 bg-slate-50 hover:bg-white rounded-xl transition-all shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+              className="px-5 py-2 text-xs font-bold text-[#121110] bg-[#EDE1D3] hover:bg-[#F7EFE6] rounded-xl transition-all shadow-[0_4px_15px_rgba(237,225,211,0.18)] cursor-pointer"
             >
               {isEditModalOpen ? 'Save Changes' : 'Create Product'}
             </button>
